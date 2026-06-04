@@ -19,17 +19,30 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  categories     Category[]
-  transactions   Transaction[]
-  debts          Debt[]
-  budgets        Budget[]
-  recurringTxns  RecurringTransaction[]
-  pushSubs       PushSubscription[]
-  notifications  Notification[]
-  paymentMethods PaymentMethod[]
-  familyMembers  FamilyMember[]
+  categories          Category[]
+  transactions        Transaction[]
+  debts               Debt[]
+  budgets             Budget[]
+  recurringTxns       RecurringTransaction[]
+  pushSubs            PushSubscription[]
+  notifications       Notification[]
+  paymentMethods      PaymentMethod[]
+  familyMembers       FamilyMember[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([token])
+  @@map("password_reset_tokens")
 }
 
 // ============================================================
