@@ -5,8 +5,11 @@ services:
     build: .
     container_name: finance-tracker
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
     environment:
       - DATABASE_URL=postgresql://finance:${DB_PASSWORD}@db:5432/finance_tracker
+      - AUTH_SECRET=${AUTH_SECRET}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=https://finance.srv1068566.hstgr.cloud
       - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
@@ -20,9 +23,8 @@ services:
       - "traefik.http.routers.finance.rule=Host(`finance.srv1068566.hstgr.cloud`)"
       - "traefik.http.routers.finance.entrypoints=websecure"
       - "traefik.http.routers.finance.tls.certresolver=letsencrypt"
-      - "traefik.http.services.finance.loadbalancer.server.port=3000"
+      - "traefik.http.services.finance.loadbalancer.server.url=http://127.0.0.1:3000"
     networks:
-      - traefik-public
       - finance-internal
 
   db:
@@ -47,7 +49,5 @@ volumes:
   pgdata:
 
 networks:
-  traefik-public:
-    external: true
   finance-internal:
     driver: bridge
