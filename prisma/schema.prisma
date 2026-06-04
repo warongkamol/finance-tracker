@@ -1,0 +1,331 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// AUTH & USERS
+// ============================================================
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  categories     Category[]
+  transactions   Transaction[]
+  debts          Debt[]
+  budgets        Budget[]
+  recurringTxns  RecurringTransaction[]
+  pushSubs       PushSubscription[]
+  notifications  Notification[]
+  paymentMethods PaymentMethod[]
+  familyMembers  FamilyMember[]
+
+  @@map("users")
+}
+
+// ============================================================
+// CATEGORIES (with sub-categories)
+// ============================================================
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+}
+
+model Category {
+  id        String       @id @default(cuid())
+  name      String
+  type      CategoryType
+  icon      String?
+  color     String?
+  parentId  String?      @map("parent_id")
+  parent    Category?    @relation("SubCategories", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Category[]   @relation("SubCategories")
+  userId    String       @map("user_id")
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isDefault Boolean      @default(false) @map("is_default")
+  sortOrder Int          @default(0) @map("sort_order")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  transactions  Transaction[]
+  budgetItems   BudgetItem[]
+  recurringTxns RecurringTransaction[]
+
+  @@index([userId, type])
+  @@map("categories")
+}
+
+// ============================================================
+// PAYMENT METHODS
+// ============================================================
+
+enum PaymentMethodType {
+  CASH
+  QR_PAYMENT
+  BANK_TRANSFER
+  CREDIT_CARD
+  DEBIT_CARD
+  PAY_LATER
+  OTHER
+}
+
+model PaymentMethod {
+  id        String            @id @default(cuid())
+  name      String
+  type      PaymentMethodType
+  userId    String            @map("user_id")
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isDefault Boolean           @default(false) @map("is_default")
+  sortOrder Int               @default(0) @map("sort_order")
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  transactions Transaction[]
+
+  @@index([userId])
+  @@map("payment_methods")
+}
+
+// ============================================================
+// TRANSACTIONS (Income + Expense)
+// ============================================================
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+model Transaction {
+  id              String          @id @default(cuid())
+  type            TransactionType
+  amount          Decimal         @db.Decimal(12, 2)
+  description     String?
+  date            DateTime        @db.Date
+  categoryId      String          @map("category_id")
+  category        Category        @relation(fields: [categoryId], references: [id])
+  paymentMethodId String?         @map("payment_method_id")
+  paymentMethod   PaymentMethod?  @relation(fields: [paymentMethodId], references: [id])
+  userId          String          @map("user_id")
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isFamily       Boolean       @default(false) @map("is_family")
+  familyMemberId String?       @map("family_member_id")
+  familyMember   FamilyMember? @relation(fields: [familyMemberId], references: [id])
+
+  debtPaymentId String?      @unique @map("debt_payment_id")
+  debtPayment   DebtPayment? @relation(fields: [debtPaymentId], references: [id])
+
+  recurringTxnId String?               @map("recurring_txn_id")
+  recurringTxn   RecurringTransaction? @relation(fields: [recurringTxnId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, date])
+  @@index([userId, type, date])
+  @@index([categoryId])
+  @@map("transactions")
+}
+
+// ============================================================
+// DEBTS & INSTALLMENTS
+// ============================================================
+
+enum DebtStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model Debt {
+  id            String     @id @default(cuid())
+  name          String
+  totalAmount   Decimal    @db.Decimal(12, 2) @map("total_amount")
+  monthlyAmount Decimal?   @db.Decimal(12, 2) @map("monthly_amount")
+  totalMonths   Int        @map("total_months")
+  interestRate  Decimal?   @db.Decimal(5, 2) @map("interest_rate")
+  startDate     DateTime   @db.Date @map("start_date")
+  endDate       DateTime   @db.Date @map("end_date")
+  notes         String?
+  status        DebtStatus @default(ACTIVE)
+  userId        String     @map("user_id")
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  payments DebtPayment[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, status])
+  @@map("debts")
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+model DebtPayment {
+  id            String        @id @default(cuid())
+  debtId        String        @map("debt_id")
+  debt          Debt          @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  installmentNo Int           @map("installment_no")
+  dueDate       DateTime      @db.Date @map("due_date")
+  amount        Decimal       @db.Decimal(12, 2)
+  status        PaymentStatus @default(PENDING)
+  paidDate      DateTime?     @db.Date @map("paid_date")
+
+  transaction Transaction?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([debtId, status])
+  @@index([dueDate, status])
+  @@map("debt_payments")
+}
+
+// ============================================================
+// BUDGET PLANNING (12-month)
+// ============================================================
+
+enum BudgetItemType {
+  INCOME
+  EXPENSE
+  LIABILITY
+  SAVING
+}
+
+model Budget {
+  id     String @id @default(cuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  year   Int
+  month  Int
+
+  items BudgetItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, year, month])
+  @@map("budgets")
+}
+
+model BudgetItem {
+  id         String         @id @default(cuid())
+  budgetId   String         @map("budget_id")
+  budget     Budget         @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  name       String
+  type       BudgetItemType
+  amount     Decimal        @db.Decimal(12, 2)
+  categoryId String?        @map("category_id")
+  category   Category?      @relation(fields: [categoryId], references: [id])
+  notes      String?
+  sortOrder  Int            @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([budgetId])
+  @@map("budget_items")
+}
+
+// ============================================================
+// RECURRING TRANSACTIONS
+// ============================================================
+
+enum Frequency {
+  MONTHLY
+  YEARLY
+}
+
+model RecurringTransaction {
+  id          String          @id @default(cuid())
+  name        String
+  type        TransactionType
+  amount      Decimal         @db.Decimal(12, 2)
+  categoryId  String          @map("category_id")
+  category    Category        @relation(fields: [categoryId], references: [id])
+  frequency   Frequency       @default(MONTHLY)
+  reminderDay Int             @default(1) @map("reminder_day")
+  isActive    Boolean         @default(true) @map("is_active")
+  userId      String          @map("user_id")
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, isActive])
+  @@map("recurring_transactions")
+}
+
+// ============================================================
+// FAMILY MEMBERS (Phase 7)
+// ============================================================
+
+model FamilyMember {
+  id     String @id @default(cuid())
+  name   String
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("family_members")
+}
+
+// ============================================================
+// NOTIFICATIONS & PUSH
+// ============================================================
+
+enum NotificationType {
+  DEBT_REMINDER
+  RECURRING_REMINDER
+  OVERDUE_ALERT
+  SYSTEM
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String
+  p256dh    String
+  auth      String
+  userAgent String?  @map("user_agent")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+model Notification {
+  id            String           @id @default(cuid())
+  userId        String           @map("user_id")
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  message       String
+  type          NotificationType
+  referenceId   String?          @map("reference_id")
+  referenceType String?          @map("reference_type")
+  isRead        Boolean          @default(false) @map("is_read")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}

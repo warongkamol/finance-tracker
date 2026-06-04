@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    container_name: finance-tracker
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://finance:${DB_PASSWORD}@db:5432/finance_tracker
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=https://finance.srv1068566.hstgr.cloud
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
+      - VAPID_SUBJECT=${VAPID_SUBJECT}
+    depends_on:
+      db:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.finance.rule=Host(`finance.srv1068566.hstgr.cloud`)"
+      - "traefik.http.routers.finance.entrypoints=websecure"
+      - "traefik.http.routers.finance.tls.certresolver=letsencrypt"
+      - "traefik.http.services.finance.loadbalancer.server.port=3000"
+    networks:
+      - traefik-public
+      - finance-internal
+
+  db:
+    image: postgres:16-alpine
+    container_name: finance-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=finance_tracker
+      - POSTGRES_USER=finance
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finance -d finance_tracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - finance-internal
+
+volumes:
+  pgdata:
+
+networks:
+  traefik-public:
+    external: true
+  finance-internal:
+    driver: bridge
