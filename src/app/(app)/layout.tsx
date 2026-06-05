@@ -10,24 +10,30 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session) redirect("/login");
 
   return (
-    <div className="min-h-screen bg-muted/20">
-      {/* Top header */}
-      <header className="fixed top-0 left-0 right-0 z-40 h-14 bg-background border-b border-border flex items-center px-4">
-        <div className="flex flex-1 items-center justify-between max-w-lg mx-auto w-full">
-          <span className="font-semibold text-base">💰 Finance</span>
-          <div className="flex items-center gap-2">
-            <Link href="/notifications" className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
-              <Bell className="h-5 w-5" />
+    <div className="min-h-screen bg-secondary">
+      {/* iOS-style navigation bar — frosted glass */}
+      <header className="fixed top-0 left-0 right-0 z-40 h-14 bg-background/80 backdrop-blur-xl border-b border-border/50">
+        <div className="flex items-center justify-between h-full px-4 max-w-lg mx-auto">
+          <span className="text-[17px] font-semibold tracking-tight">💰 Finance</span>
+          <div className="flex items-center gap-1">
+            <Link
+              href="/notifications"
+              className="h-8 w-8 flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
+            >
+              <Bell className="h-[18px] w-[18px]" />
             </Link>
-            <Link href="/settings" className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
-              <Settings className="h-5 w-5" />
+            <Link
+              href="/settings"
+              className="h-8 w-8 flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
+            >
+              <Settings className="h-[18px] w-[18px]" />
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Page content — padded for top header and bottom nav */}
-      <main className="pt-14 pb-20 max-w-lg mx-auto px-4 min-h-screen">
+      {/* Page content */}
+      <main className="pt-14 pb-24 max-w-lg mx-auto px-4 min-h-screen">
         {children}
       </main>
 

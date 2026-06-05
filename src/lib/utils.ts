@@ -42,3 +42,15 @@ export function getCurrentMonth() {
   const now = new Date();
   return { year: now.getFullYear(), month: now.getMonth() + 1 };
 }
+
+export function addMonths(date: Date, months: number): Date {
+  const result = new Date(date);
+  result.setMonth(result.getMonth() + months);
+  return result;
+}
+
+export function formatMonthYear(year: number, month: number): string {
+  return new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric" }).format(
+    new Date(year, month - 1, 1)
+  );
+}

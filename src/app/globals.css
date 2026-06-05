@@ -4,7 +4,6 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* shadcn/ui neutral palette */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -30,59 +29,79 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* ─── Light mode (iOS system colors) ────────────────────────────────────── */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --background: oklch(1 0 0);                      /* #FFFFFF */
+  --foreground: oklch(0.09 0 0);                   /* ~#161616 */
+  --card: oklch(1 0 0);                            /* #FFFFFF */
+  --card-foreground: oklch(0.09 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --radius: 0.625rem;
+  --popover-foreground: oklch(0.09 0 0);
+  --primary: oklch(0.576 0.217 254.5);             /* #007AFF – iOS blue */
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.966 0.002 286);             /* #F2F2F7 – iOS grouped bg */
+  --secondary-foreground: oklch(0.09 0 0);
+  --muted: oklch(0.966 0.002 286);                 /* #F2F2F7 */
+  --muted-foreground: oklch(0.555 0.003 264);      /* #8E8E93 – iOS secondary label */
+  --accent: oklch(0.944 0.012 254.5);              /* light blue tint */
+  --accent-foreground: oklch(0.576 0.217 254.5);   /* iOS blue */
+  --destructive: oklch(0.577 0.245 27.3);          /* #FF3B30 – iOS red */
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.921 0.003 264);                /* #E5E5EA – iOS separator */
+  --input: oklch(0.966 0.002 286);                 /* #F2F2F7 – filled input bg */
+  --ring: oklch(0.576 0.217 254.5);               /* iOS blue */
+  --radius: 0.75rem;                               /* 12px base */
 }
 
+/* ─── Dark mode (iOS dark system colors) ────────────────────────────────── */
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: oklch(0.09 0 0);                   /* #161616 */
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.155 0 0);                        /* #282828 */
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.155 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
+  --primary: oklch(0.601 0.217 254.5);             /* #0A84FF – iOS dark blue */
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.155 0 0);                   /* #282828 */
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --muted: oklch(0.2 0 0);                         /* #333333 */
+  --muted-foreground: oklch(0.63 0.003 264);       /* #98989D */
+  --accent: oklch(0.22 0.02 254.5);
+  --accent-foreground: oklch(0.601 0.217 254.5);
+  --destructive: oklch(0.608 0.245 27.3);          /* #FF453A – iOS dark red */
+  --destructive-foreground: oklch(1 0 0);
   --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --input: oklch(1 0 0 / 8%);
+  --ring: oklch(0.601 0.217 254.5);
 }
 
+/* ─── Base ───────────────────────────────────────────────────────────────── */
 * {
   border-color: var(--border);
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  background: var(--background);
+  background: var(--secondary);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── iOS-style utilities ────────────────────────────────────────────────── */
+.ios-card {
+  background: var(--card);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.dark .ios-card {
+  box-shadow: none;
+}
+
+/* Smooth number transitions */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }

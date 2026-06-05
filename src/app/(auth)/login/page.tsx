@@ -9,10 +9,9 @@ import { signIn } from "next-auth/react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
+import { cn } from "@/lib/utils";
 
 function LoginForm() {
   const router = useRouter();
@@ -20,7 +19,11 @@ function LoginForm() {
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
   const [showPassword, setShowPassword] = useState(false);
 
-  const form = useForm<LoginInput>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
@@ -42,74 +45,65 @@ function LoginForm() {
   }
 
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>อีเมล</FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="email@example.com" autoComplete="email" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+      {/* Fields card */}
+      <div className="ios-card overflow-hidden divide-y divide-border/60">
+        {/* Email */}
+        <div className="px-4 py-1">
+          <label className="text-[12px] font-medium text-muted-foreground uppercase tracking-wide">อีเมล</label>
+          <Input
+            type="email"
+            placeholder="email@example.com"
+            autoComplete="email"
+            className={cn("bg-transparent px-0 h-10 text-[16px] focus-visible:ring-0 rounded-none", errors.email && "text-destructive")}
+            {...register("email")}
+          />
+          {errors.email && <p className="text-[12px] text-destructive pb-1">{errors.email.message}</p>}
+        </div>
+
+        {/* Password */}
+        <div className="px-4 py-1">
+          <label className="text-[12px] font-medium text-muted-foreground uppercase tracking-wide">รหัสผ่าน</label>
+          <div className="relative">
+            <Input
+              type={showPassword ? "text" : "password"}
+              placeholder="รหัสผ่าน"
+              autoComplete="current-password"
+              className={cn("bg-transparent px-0 h-10 text-[16px] focus-visible:ring-0 rounded-none pr-10", errors.password && "text-destructive")}
+              {...register("password")}
             />
+            <button
+              type="button"
+              className="absolute right-0 top-1/2 -translate-y-1/2 p-2 text-muted-foreground"
+              onClick={() => setShowPassword((v) => !v)}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          {errors.password && <p className="text-[12px] text-destructive pb-1">{errors.password.message}</p>}
+        </div>
+      </div>
 
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>รหัสผ่าน</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="รหัสผ่าน"
-                        autoComplete="current-password"
-                        {...field}
-                      />
-                      <button
-                        type="button"
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                        onClick={() => setShowPassword((v) => !v)}
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+      {/* Forgot password */}
+      <div className="flex justify-end px-1">
+        <Link href="/forgot-password" className="text-[14px] text-primary font-medium">
+          ลืมรหัสผ่าน?
+        </Link>
+      </div>
 
-            <div className="flex justify-end">
-              <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-primary">
-                ลืมรหัสผ่าน?
-              </Link>
-            </div>
+      {/* Submit */}
+      <Button type="submit" className="w-full h-12 text-[17px] rounded-2xl" disabled={isSubmitting}>
+        {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" />กำลังเข้าสู่ระบบ...</> : "เข้าสู่ระบบ"}
+      </Button>
 
-            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังเข้าสู่ระบบ...</>
-              ) : "เข้าสู่ระบบ"}
-            </Button>
-          </form>
-        </Form>
-
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          ยังไม่มีบัญชี?{" "}
-          <Link href="/register" className="text-primary font-medium hover:underline">
-            สมัครสมาชิก
-          </Link>
-        </p>
-      </CardContent>
-    </Card>
+      {/* Register link */}
+      <p className="text-center text-[14px] text-muted-foreground pt-2">
+        ยังไม่มีบัญชี?{" "}
+        <Link href="/register" className="text-primary font-semibold">
+          สมัครสมาชิก
+        </Link>
+      </p>
+    </form>
   );
 }
 
