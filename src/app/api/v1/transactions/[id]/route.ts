@@ -142,6 +142,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     const { id } = await params;
     const existing = await prisma.transaction.findFirst({
       where: { id, userId: session.user.id },
+      include: { debtPayment: { include: { debt: true } } },
     });
     if (!existing) {
       return NextResponse.json(
@@ -150,9 +151,31 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       );
     }
 
-    await prisma.transaction.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      // Delete the transaction first (breaks the unique FK constraint)
+      await tx.transaction.delete({ where: { id } });
 
-    return NextResponse.json({ success: true, data: null });
+      // If this transaction was a debt payment, revert the installment to PENDING
+      if (existing.debtPaymentId) {
+        await tx.debtPayment.update({
+          where: { id: existing.debtPaymentId },
+          data: { status: "PENDING", paidDate: null },
+        });
+
+        // If the debt was COMPLETED, revert it back to ACTIVE
+        if (existing.debtPayment?.debt.status === "COMPLETED") {
+          await tx.debt.update({
+            where: { id: existing.debtPayment.debt.id },
+            data: { status: "ACTIVE" },
+          });
+        }
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: { revertedDebtPayment: !!existing.debtPaymentId },
+    });
   } catch {
     return NextResponse.json(
       { success: false, error: { code: "INTERNAL_ERROR", message: "เกิดข้อผิดพลาด กรุณาลองใหม่" } },

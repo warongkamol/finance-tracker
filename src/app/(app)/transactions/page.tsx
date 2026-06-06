@@ -31,6 +31,8 @@ interface Transaction {
   category: { id: string; name: string; icon: string | null; color: string | null };
   paymentMethodId: string | null;
   paymentMethod: { id: string; name: string } | null;
+  debtPaymentId: string | null;
+  debtPayment: { id: string; installmentNo: number; debt: { id: string; name: string } } | null;
 }
 
 interface Summary {
@@ -277,9 +279,16 @@ export default function TransactionsPage() {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-medium truncate">{tx.category.name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[14px] font-medium truncate">{tx.category.name}</p>
+                        {tx.debtPayment && (
+                          <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#FF9500]/15 text-[#FF9500]">
+                            💳 งวด {tx.debtPayment.installmentNo}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[12px] text-muted-foreground truncate">
-                        {tx.description ?? tx.paymentMethod?.name ?? ""}
+                        {tx.debtPayment ? tx.debtPayment.debt.name : (tx.description ?? tx.paymentMethod?.name ?? "")}
                       </p>
                     </div>
 
@@ -343,6 +352,20 @@ export default function TransactionsPage() {
               ยืนยันการลบ &quot;{deletingTx?.category.name}&quot; {formatCurrency(parseFloat(deletingTx?.amount ?? "0"))}?
             </DialogDescription>
           </DialogHeader>
+
+          {/* Warning if linked to debt payment */}
+          {deletingTx?.debtPayment && (
+            <div className="flex gap-2.5 rounded-xl bg-[#FF9500]/10 border border-[#FF9500]/30 px-4 py-3">
+              <AlertCircle className="h-4 w-4 text-[#FF9500] shrink-0 mt-0.5" />
+              <div>
+                <p className="text-[13px] font-semibold text-[#FF9500]">รายการนี้เชื่อมกับหนี้สิน</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">
+                  ลบแล้ว งวดที่ {deletingTx.debtPayment.installmentNo} ของ &quot;{deletingTx.debtPayment.debt.name}&quot; จะกลับเป็น <strong>ยังไม่ได้จ่าย</strong> โดยอัตโนมัติ
+                </p>
+              </div>
+            </div>
+          )}
+
           <DialogFooter className="mt-4 gap-2">
             <Button variant="secondary" onClick={() => setDeletingTx(null)} disabled={deleteLoading}>ยกเลิก</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleteLoading}>

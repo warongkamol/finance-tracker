@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
       include: {
         category: { select: { id: true, name: true, icon: true, color: true } },
         paymentMethod: { select: { id: true, name: true } },
+        debtPayment: { select: { id: true, installmentNo: true, debt: { select: { id: true, name: true } } } },
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     });
