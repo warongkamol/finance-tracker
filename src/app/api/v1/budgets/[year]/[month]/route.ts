@@ -52,6 +52,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const items = parsed.data.items.map((item, idx) => ({
     budgetId: budget.id,
+    debtId: item.debtId || null,
     name: item.name,
     type: item.type,
     amount: item.amount,

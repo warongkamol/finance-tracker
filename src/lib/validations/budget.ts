@@ -6,6 +6,7 @@ export const budgetItemSchema = z.object({
   type: z.enum(["INCOME", "EXPENSE", "LIABILITY", "SAVING"]),
   amount: z.coerce.number().min(0, "จำนวนเงินต้องไม่ติดลบ"),
   categoryId: z.string().optional().nullable(),
+  debtId: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   sortOrder: z.coerce.number().int().default(0),
 });

@@ -152,10 +152,29 @@ export async function DELETE(
     });
 
     if (hasPaid) {
+      // Soft cancel: remove only future budget items linked to this debt
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      const futureBudgets = await prisma.budget.findMany({
+        where: {
+          userId: session.user.id,
+          OR: [
+            { year: { gt: currentYear } },
+            { year: currentYear, month: { gte: currentMonth } },
+          ],
+        },
+        select: { id: true },
+      });
+      await prisma.budgetItem.deleteMany({
+        where: { debtId: id, budgetId: { in: futureBudgets.map(b => b.id) } },
+      });
+
       await prisma.debt.update({ where: { id }, data: { status: "CANCELLED" } });
       return NextResponse.json({ success: true, data: { cancelled: true } });
     }
 
+    // Hard delete: onDelete:Cascade on budgetItems removes linked budget items automatically
     await prisma.debt.delete({ where: { id } });
     return NextResponse.json({ success: true, data: { deleted: true } });
   } catch {

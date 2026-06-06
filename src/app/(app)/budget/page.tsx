@@ -71,6 +71,7 @@ interface BudgetItem {
   type: ItemType;
   amount: number;
   categoryId?: string | null;
+  debtId?: string | null;
   notes?: string | null;
   sortOrder: number;
   category?: { id: string; name: string; icon: string | null } | null;
@@ -438,6 +439,7 @@ export default function BudgetPage() {
                 type: "LIABILITY" as ItemType,
                 amount: p.amount,
                 categoryId: null,
+                debtId: debt.id,
                 notes: `ยอดคงเหลือ ${formatCurrency(debt.remainingBalance)}`,
                 sortOrder: current.length,
               };

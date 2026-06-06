@@ -36,12 +36,12 @@ export async function GET(req: NextRequest) {
 
     // Compute remaining balance per debt
     const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
     const enriched = debts.map((debt) => {
       const unpaidPayments = debt.payments.filter((p) => p.status !== "PAID");
-      const remainingBalance = unpaidPayments.reduce(
-        (sum, p) => sum + Number(p.amount),
-        0
-      );
+      const remainingBalance = unpaidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
       const paidCount = debt.payments.filter((p) => p.status === "PAID").length;
       const overdueCount = debt.payments.filter(
         (p) => p.status === "PENDING" && new Date(p.dueDate) < now
@@ -49,7 +49,38 @@ export async function GET(req: NextRequest) {
       return { ...debt, remainingBalance, paidCount, overdueCount };
     });
 
-    return NextResponse.json({ success: true, data: enriched });
+    // Planned future liabilities from budget (not linked to any existing debt)
+    const futureBudgets = await prisma.budget.findMany({
+      where: {
+        userId: session.user.id,
+        OR: [
+          { year: { gt: currentYear } },
+          { year: currentYear, month: { gte: currentMonth } },
+        ],
+      },
+      include: {
+        items: {
+          where: { type: "LIABILITY", debtId: null },
+          select: { id: true, name: true, amount: true, notes: true },
+        },
+      },
+      orderBy: [{ year: "asc" }, { month: "asc" }],
+    });
+
+    const plannedLiabilities = futureBudgets
+      .filter(b => b.items.length > 0)
+      .map(b => ({
+        year: b.year,
+        month: b.month,
+        items: b.items.map(item => ({
+          id: item.id,
+          name: item.name,
+          amount: Number(item.amount),
+          notes: item.notes,
+        })),
+      }));
+
+    return NextResponse.json({ success: true, data: enriched, plannedLiabilities });
   } catch {
     return NextResponse.json(
       { success: false, error: { code: "INTERNAL_ERROR", message: "เกิดข้อผิดพลาด กรุณาลองใหม่" } },
@@ -109,6 +140,37 @@ export async function POST(req: NextRequest) {
       }));
 
       await tx.debtPayment.createMany({ data: payments });
+
+      // Auto-create budget LIABILITY items for each payment month
+      for (let i = 0; i < totalMonths; i++) {
+        const dueDate = addMonths(start, i);
+        const payYear = dueDate.getFullYear();
+        const payMonth = dueDate.getMonth() + 1;
+
+        const budget = await tx.budget.upsert({
+          where: { userId_year_month: { userId: session.user.id, year: payYear, month: payMonth } },
+          create: { userId: session.user.id, year: payYear, month: payMonth },
+          update: {},
+        });
+
+        // Find max sortOrder for this budget
+        const maxOrder = await tx.budgetItem.aggregate({
+          where: { budgetId: budget.id },
+          _max: { sortOrder: true },
+        });
+
+        await tx.budgetItem.create({
+          data: {
+            budgetId: budget.id,
+            debtId: created.id,
+            name: created.name,
+            type: "LIABILITY",
+            amount: new Prisma.Decimal(effectiveMonthly),
+            notes: `งวดที่ ${i + 1}/${totalMonths}`,
+            sortOrder: (maxOrder._max.sortOrder ?? 0) + 1,
+          },
+        });
+      }
 
       return tx.debt.findUnique({
         where: { id: created.id },
