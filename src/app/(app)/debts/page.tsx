@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, ChevronRight, AlertCircle, BarChart3 } from "lucide-react";
+import { Plus, ChevronRight, AlertCircle } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { DebtForm } from "@/components/forms/debt-form";
-import { formatCurrency, formatDate, getMonthName, cn } from "@/lib/utils";
+import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import Link from "next/link";
 
 interface DebtPaymentSummary {
@@ -31,19 +31,6 @@ interface Debt {
   remainingBalance: number;
   paidCount: number;
   overdueCount: number;
-}
-
-interface PlannedLiabilityItem {
-  id: string;
-  name: string;
-  amount: number;
-  notes: string | null;
-}
-
-interface PlannedLiability {
-  year: number;
-  month: number;
-  items: PlannedLiabilityItem[];
 }
 
 type TabType = "ACTIVE" | "COMPLETED" | "CANCELLED";
@@ -74,7 +61,6 @@ function ProgressBar({ paid, total }: { paid: number; total: number }) {
 export default function DebtsPage() {
   const [tab, setTab] = useState<TabType>("ACTIVE");
   const [debts, setDebts] = useState<Debt[]>([]);
-  const [plannedLiabilities, setPlannedLiabilities] = useState<PlannedLiability[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deletingDebt, setDeletingDebt] = useState<Debt | null>(null);
@@ -87,7 +73,6 @@ export default function DebtsPage() {
       const data = await res.json();
       if (data.success) {
         setDebts(data.data);
-        if (tab === "ACTIVE") setPlannedLiabilities(data.plannedLiabilities ?? []);
       }
     } finally {
       setLoading(false);
@@ -192,42 +177,6 @@ export default function DebtsPage() {
               </div>
             </Link>
           ))}
-        </div>
-      )}
-
-      {/* Planned liabilities from budget (future months, no linked debt) */}
-      {tab === "ACTIVE" && !loading && plannedLiabilities.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <p className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide">
-              💳 ที่วางแผนไว้จากงบการเงิน
-            </p>
-            <Link href="/budget" className="flex items-center gap-1 text-[13px] text-primary font-medium">
-              <BarChart3 className="h-3.5 w-3.5" /> ดูงบ
-            </Link>
-          </div>
-          <div className="ios-card overflow-hidden divide-y divide-border/50">
-            {plannedLiabilities.map(pl => (
-              <div key={`${pl.year}-${pl.month}`} className="px-4 py-3">
-                <p className="text-[13px] font-semibold text-[#FF9500] mb-1.5">
-                  {getMonthName(pl.month)} {pl.year + 543}
-                </p>
-                {pl.items.map(item => (
-                  <div key={item.id} className="flex justify-between items-center py-1">
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-medium truncate">{item.name}</p>
-                      {item.notes && (
-                        <p className="text-[11px] text-muted-foreground">{item.notes}</p>
-                      )}
-                    </div>
-                    <p className="text-[14px] font-bold text-[#FF9500] tabular-nums shrink-0 ml-3">
-                      {formatCurrency(item.amount)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
         </div>
       )}
 

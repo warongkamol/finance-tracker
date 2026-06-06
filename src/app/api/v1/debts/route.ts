@@ -36,8 +36,6 @@ export async function GET(req: NextRequest) {
 
     // Compute remaining balance per debt
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
 
     const enriched = debts.map((debt) => {
       const unpaidPayments = debt.payments.filter((p) => p.status !== "PAID");
@@ -49,38 +47,7 @@ export async function GET(req: NextRequest) {
       return { ...debt, remainingBalance, paidCount, overdueCount };
     });
 
-    // Planned future liabilities from budget (not linked to any existing debt)
-    const futureBudgets = await prisma.budget.findMany({
-      where: {
-        userId: session.user.id,
-        OR: [
-          { year: { gt: currentYear } },
-          { year: currentYear, month: { gte: currentMonth } },
-        ],
-      },
-      include: {
-        items: {
-          where: { type: "LIABILITY", debtId: null },
-          select: { id: true, name: true, amount: true, notes: true },
-        },
-      },
-      orderBy: [{ year: "asc" }, { month: "asc" }],
-    });
-
-    const plannedLiabilities = futureBudgets
-      .filter(b => b.items.length > 0)
-      .map(b => ({
-        year: b.year,
-        month: b.month,
-        items: b.items.map(item => ({
-          id: item.id,
-          name: item.name,
-          amount: Number(item.amount),
-          notes: item.notes,
-        })),
-      }));
-
-    return NextResponse.json({ success: true, data: enriched, plannedLiabilities });
+    return NextResponse.json({ success: true, data: enriched });
   } catch {
     return NextResponse.json(
       { success: false, error: { code: "INTERNAL_ERROR", message: "เกิดข้อผิดพลาด กรุณาลองใหม่" } },
