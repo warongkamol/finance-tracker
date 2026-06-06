@@ -23,6 +23,14 @@ interface PaymentMethod {
   name: string;
 }
 
+interface PrefillValues {
+  type?: "INCOME" | "EXPENSE";
+  amount?: number;
+  categoryId?: string;
+  paymentMethodId?: string | null;
+  description?: string;
+}
+
 interface TransactionFormProps {
   defaultValues?: {
     id: string;
@@ -33,6 +41,7 @@ interface TransactionFormProps {
     categoryId: string;
     paymentMethodId: string | null;
   };
+  prefill?: PrefillValues;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -56,9 +65,9 @@ function FormRow({ label, error, children }: { label: string; error?: string; ch
   );
 }
 
-export function TransactionForm({ defaultValues, onSuccess, onCancel }: TransactionFormProps) {
+export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }: TransactionFormProps) {
   const isEdit = !!defaultValues;
-  const [txType, setTxType] = useState<"INCOME" | "EXPENSE">(defaultValues?.type ?? "EXPENSE");
+  const [txType, setTxType] = useState<"INCOME" | "EXPENSE">(defaultValues?.type ?? prefill?.type ?? "EXPENSE");
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -67,12 +76,12 @@ export function TransactionForm({ defaultValues, onSuccess, onCancel }: Transact
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<CreateTransactionInput>({
     resolver: zodResolver(createTransactionSchema),
     defaultValues: {
-      type: defaultValues?.type ?? "EXPENSE",
-      amount: defaultValues?.amount ? parseFloat(defaultValues.amount) : undefined,
-      description: defaultValues?.description ?? "",
+      type: defaultValues?.type ?? prefill?.type ?? "EXPENSE",
+      amount: defaultValues?.amount ? parseFloat(defaultValues.amount) : prefill?.amount ?? undefined,
+      description: defaultValues?.description ?? prefill?.description ?? "",
       date: defaultValues?.date ? toDateInputValue(defaultValues.date) : todayString(),
-      categoryId: defaultValues?.categoryId ?? "",
-      paymentMethodId: defaultValues?.paymentMethodId ?? null,
+      categoryId: defaultValues?.categoryId ?? prefill?.categoryId ?? "",
+      paymentMethodId: defaultValues?.paymentMethodId ?? prefill?.paymentMethodId ?? null,
     },
   });
 

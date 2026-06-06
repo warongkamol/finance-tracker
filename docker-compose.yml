@@ -13,8 +13,10 @@ services:
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=https://finance.srv1068566.hstgr.cloud
       - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
+      - NEXT_PUBLIC_VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
       - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
       - VAPID_SUBJECT=${VAPID_SUBJECT}
+      - CRON_SECRET=${CRON_SECRET}
     depends_on:
       db:
         condition: service_healthy

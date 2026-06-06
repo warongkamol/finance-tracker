@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Receipt, CreditCard, BarChart3 } from "lucide-react";
+import { Home, Receipt, CreditCard, BarChart3, BellRing } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "หน้าหลัก", icon: Home },
   { href: "/transactions", label: "รายการ", icon: Receipt },
   { href: "/debts", label: "หนี้สิน", icon: CreditCard },
+  { href: "/recurring", label: "แจ้งเตือน", icon: BellRing },
   { href: "/budget", label: "งบการเงิน", icon: BarChart3 },
 ] as const;
 

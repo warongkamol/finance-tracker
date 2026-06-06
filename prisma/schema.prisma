@@ -101,7 +101,8 @@ model PaymentMethod {
   sortOrder Int               @default(0) @map("sort_order")
   createdAt DateTime          @default(now()) @map("created_at")
 
-  transactions Transaction[]
+  transactions  Transaction[]
+  recurringTxns RecurringTransaction[]
 
   @@index([userId])
   @@map("payment_methods")
@@ -261,17 +262,23 @@ enum Frequency {
 }
 
 model RecurringTransaction {
-  id          String          @id @default(cuid())
-  name        String
-  type        TransactionType
-  amount      Decimal         @db.Decimal(12, 2)
-  categoryId  String          @map("category_id")
-  category    Category        @relation(fields: [categoryId], references: [id])
-  frequency   Frequency       @default(MONTHLY)
-  reminderDay Int             @default(1) @map("reminder_day")
-  isActive    Boolean         @default(true) @map("is_active")
-  userId      String          @map("user_id")
-  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String          @id @default(cuid())
+  name              String
+  type              TransactionType
+  amount            Decimal         @db.Decimal(12, 2)
+  categoryId        String          @map("category_id")
+  category          Category        @relation(fields: [categoryId], references: [id])
+  paymentMethodId   String?         @map("payment_method_id")
+  paymentMethod     PaymentMethod?  @relation(fields: [paymentMethodId], references: [id])
+  frequency         Frequency       @default(MONTHLY)
+  reminderDay       Int             @default(1) @map("reminder_day")
+  isLastDayOfMonth  Boolean         @default(false) @map("is_last_day_of_month")
+  startDate         DateTime        @db.Date @map("start_date")
+  endDate           DateTime        @db.Date @map("end_date")
+  notes             String?
+  isActive          Boolean         @default(true) @map("is_active")
+  userId            String          @map("user_id")
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   transactions Transaction[]
 
@@ -315,7 +322,7 @@ model PushSubscription {
   id        String   @id @default(cuid())
   userId    String   @map("user_id")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  endpoint  String
+  endpoint  String   @unique
   p256dh    String
   auth      String
   userAgent String?  @map("user_agent")
