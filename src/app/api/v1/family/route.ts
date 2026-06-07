@@ -21,7 +21,7 @@ export async function GET() {
             id: true,
             inviteCode: true,
             name: true,
-            members: { select: { id: true, name: true, email: true, familyNickname: true } },
+            members: { select: { id: true, name: true, email: true } },
           },
         },
       },
@@ -32,8 +32,8 @@ export async function GET() {
     }
 
     // Private aliases the caller has set for other members — only the caller
-    // can see/edit these; they override the target's shared nickname, but
-    // only in the caller's own view.
+    // can see/edit these; they override the target's profile name, but only
+    // in the caller's own view.
     const myAliases = await prisma.familyMemberAlias.findMany({
       where: { viewerId: session.user.id },
       select: { targetId: true, nickname: true },
@@ -47,7 +47,7 @@ export async function GET() {
         return {
           ...m,
           myAlias,
-          displayName: myAlias ?? m.familyNickname ?? m.name,
+          displayName: myAlias ?? m.name,
           isMe: m.id === session.user.id,
         };
       }),

@@ -34,13 +34,13 @@ export async function GET(req: NextRequest) {
       _sum: { amount: true },
     });
 
-    // Fetch member info (name + shared nickname)
+    // Fetch member info
     const memberUsers = await prisma.user.findMany({
       where: { id: { in: familyMemberIds } },
-      select: { id: true, name: true, familyNickname: true },
+      select: { id: true, name: true },
     });
 
-    // Caller's private aliases — override the shared nickname, visible only to caller
+    // Caller's private aliases — override the member's profile name, visible only to caller
     const myAliases = await prisma.familyMemberAlias.findMany({
       where: { viewerId: session.user.id },
       select: { targetId: true, nickname: true },
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
       );
       return {
         userId: u.id,
-        name: aliasByTarget.get(u.id) ?? u.familyNickname ?? u.name,
+        name: aliasByTarget.get(u.id) ?? u.name,
         isMe: u.id === session.user.id,
         income,
         expense,

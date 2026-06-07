@@ -22,7 +22,6 @@ interface FamilyGroupMember {
   id: string;
   name: string;
   email: string;
-  familyNickname?: string | null;
   /** Private alias the CURRENT VIEWER set for this member (null if none). Visible only to the viewer. */
   myAlias?: string | null;
   displayName: string;
@@ -133,11 +132,6 @@ export default function SettingsPage() {
   const [copied, setCopied] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
-  // Shared nickname (self only) — how the WHOLE group sees you by default
-  const [editingOwnNickname, setEditingOwnNickname] = useState(false);
-  const [nicknameDraft, setNicknameDraft] = useState("");
-  const [savingNickname, setSavingNickname] = useState(false);
-
   // Private alias (others only) — what YOU privately call another member;
   // visible only to you, never to the target or anyone else
   const [editingAliasFor, setEditingAliasFor] = useState<string | null>(null);
@@ -231,54 +225,6 @@ export default function SettingsPage() {
     });
   }
 
-  // ── Shared Nickname Actions (self only) ──────────────────────────────────
-  // This is the default name the WHOLE group sees for you — anyone who hasn't
-  // set their own private alias for you will see this.
-
-  function startEditingOwnNickname(member: FamilyGroupMember) {
-    setEditingOwnNickname(true);
-    setNicknameDraft(member.familyNickname ?? "");
-  }
-
-  function cancelEditingOwnNickname() {
-    setEditingOwnNickname(false);
-    setNicknameDraft("");
-  }
-
-  async function handleSaveNickname() {
-    setSavingNickname(true);
-    try {
-      const trimmed = nicknameDraft.trim();
-      const res = await fetch("/api/v1/family/nickname", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname: trimmed || null }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setGroup((prev) =>
-          prev
-            ? {
-                ...prev,
-                members: prev.members.map((m) =>
-                  m.isMe
-                    ? {
-                        ...m,
-                        familyNickname: data.data.familyNickname,
-                        displayName: m.myAlias ?? data.data.familyNickname ?? m.name,
-                      }
-                    : m
-                ),
-              }
-            : prev
-        );
-        setEditingOwnNickname(false);
-      }
-    } finally {
-      setSavingNickname(false);
-    }
-  }
-
   // ── Private Alias Actions (other members only) ───────────────────────────
   // What YOU privately call this person — visible only to you. Overrides
   // their shared nickname/name in YOUR view only; nobody else is affected.
@@ -310,7 +256,7 @@ export default function SettingsPage() {
                 ...prev,
                 members: prev.members.map((m) =>
                   m.id === memberId
-                    ? { ...m, myAlias: data.data.nickname, displayName: data.data.nickname ?? m.familyNickname ?? m.name }
+                    ? { ...m, myAlias: data.data.nickname, displayName: data.data.nickname ?? m.name }
                     : m
                 ),
               }
@@ -552,55 +498,16 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  {/* Self: shared nickname — the default name the WHOLE group sees for you */}
-                  {m.isMe ? (
-                    <div className="mt-2 ml-12">
-                      {editingOwnNickname ? (
-                        <div className="flex items-center gap-2">
-                          <Input
-                            placeholder="ชื่อเล่นในกลุ่ม เช่น เอ็ม"
-                            value={nicknameDraft}
-                            onChange={(e) => setNicknameDraft(e.target.value)}
-                            maxLength={50}
-                            className="h-8 text-[13px] bg-input border-0 rounded-lg flex-1"
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleSaveNickname();
-                              if (e.key === "Escape") cancelEditingOwnNickname();
-                            }}
-                          />
-                          <button
-                            onClick={() => handleSaveNickname()}
-                            disabled={savingNickname}
-                            className="h-7 w-7 rounded-full bg-[#AF52DE]/10 text-[#AF52DE] flex items-center justify-center"
-                          >
-                            {savingNickname ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                          </button>
-                          <button
-                            onClick={cancelEditingOwnNickname}
-                            className="h-7 w-7 rounded-full hover:bg-muted text-muted-foreground flex items-center justify-center"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => startEditingOwnNickname(m)}
-                          className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-[#AF52DE] transition-colors"
-                        >
-                          <Pencil className="h-3 w-3" />
-                          {m.familyNickname ? `ชื่อเล่นในกลุ่ม: ${m.familyNickname}` : "ตั้งชื่อเล่นในกลุ่ม (ทุกคนเห็น)"}
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    /* Others: private alias — what only YOU call them; nobody else sees this */
+                  {/* Others only: private alias — what only YOU call them; nobody else sees this.
+                      (Your own display name comes from your profile name in the card above —
+                      no separate "group nickname" to avoid duplication.) */}
+                  {!m.isMe && (
                     <div className="mt-2 ml-12">
                       {editingAliasFor === m.id ? (
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <Input
-                              placeholder={`ชื่อที่อยากเรียก ${m.familyNickname ?? m.name} เช่น น้องบี`}
+                              placeholder={`ชื่อที่อยากเรียก ${m.name} เช่น น้องบี`}
                               value={aliasDraft}
                               onChange={(e) => setAliasDraft(e.target.value)}
                               maxLength={50}
