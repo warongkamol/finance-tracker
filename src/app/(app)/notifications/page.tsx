@@ -10,7 +10,7 @@ interface NotificationItem {
   id: string;
   title: string;
   message: string;
-  type: "DEBT_REMINDER" | "RECURRING_REMINDER" | "OVERDUE_ALERT" | "SYSTEM";
+  type: "DEBT_REMINDER" | "RECURRING_REMINDER" | "OVERDUE_ALERT" | "BUDGET_ALERT" | "SYSTEM";
   referenceId: string | null;
   referenceType: string | null;
   isRead: boolean;
@@ -31,6 +31,7 @@ function typeIcon(type: NotificationItem["type"]) {
   if (type === "RECURRING_REMINDER") return "🔔";
   if (type === "DEBT_REMINDER") return "💳";
   if (type === "OVERDUE_ALERT") return "⚠️";
+  if (type === "BUDGET_ALERT") return "🚨";
   return "📢";
 }
 
@@ -74,6 +75,8 @@ export default function NotificationsPage() {
       router.push(`/transactions/new?recurringId=${item.referenceId}`);
     } else if (item.type === "DEBT_REMINDER" && item.referenceId) {
       router.push(`/debts`);
+    } else if (item.type === "BUDGET_ALERT") {
+      router.push(`/budget`);
     }
   }
 
@@ -111,7 +114,7 @@ export default function NotificationsPage() {
       ) : (
         <div className="ios-card overflow-hidden divide-y divide-border/50">
           {items.map(item => {
-            const isActionable = item.type === "RECURRING_REMINDER" || item.type === "DEBT_REMINDER";
+            const isActionable = item.type === "RECURRING_REMINDER" || item.type === "DEBT_REMINDER" || item.type === "BUDGET_ALERT";
             return (
               <div
                 key={item.id}
@@ -142,6 +145,11 @@ export default function NotificationsPage() {
                     {item.type === "RECURRING_REMINDER" && (
                       <span className="flex items-center gap-0.5 text-[12px] text-primary font-semibold">
                         บันทึกเลย <ChevronRight className="h-3.5 w-3.5" />
+                      </span>
+                    )}
+                    {item.type === "BUDGET_ALERT" && (
+                      <span className="flex items-center gap-0.5 text-[12px] text-[#FF3B30] font-semibold">
+                        ดูงบการเงิน <ChevronRight className="h-3.5 w-3.5" />
                       </span>
                     )}
                   </div>
