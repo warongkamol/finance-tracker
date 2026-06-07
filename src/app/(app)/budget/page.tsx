@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, Copy, Pencil, Trash2, CheckCircle2, CreditCard, Lock } from "lucide-react";
+import {
+  ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
+} from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -66,6 +69,15 @@ interface MonthOverview {
   netPlanned: number;
 }
 
+interface YearlyComparisonMonth {
+  month: number;
+  monthName: string;
+  plannedIncome: number;
+  plannedExpense: number;
+  actualIncome: number;
+  actualExpense: number;
+}
+
 interface BudgetItem {
   id?: string;
   name: string;
@@ -120,6 +132,156 @@ const SHORT_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ
 
 function Skeleton({ className }: { className?: string }) {
   return <div className={cn("animate-pulse rounded-xl bg-border/50", className)} />;
+}
+
+// ─── Year Dashboard ───────────────────────────────────────────────────────────
+
+const CHART_TOOLTIP_STYLE = { fontSize: 12, borderRadius: 10, border: "none", boxShadow: "0 2px 12px rgba(0,0,0,0.12)" };
+const AXIS_TICK = { fontSize: 9, fill: "var(--muted-foreground)" } as const;
+const Y_TICK_FORMATTER = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`);
+
+function PlanVsActualChart({
+  data, plannedKey, actualKey, label, color,
+}: {
+  data: YearlyComparisonMonth[];
+  plannedKey: "plannedIncome" | "plannedExpense";
+  actualKey: "actualIncome" | "actualExpense";
+  label: string;
+  color: string;
+}) {
+  const hasData = data.some(d => d[plannedKey] > 0 || d[actualKey] > 0);
+
+  return (
+    <div>
+      <p className="text-[12px] font-medium text-muted-foreground mb-1">{label}</p>
+      {!hasData ? (
+        <p className="text-center py-6 text-[13px] text-muted-foreground">ยังไม่มีข้อมูล</p>
+      ) : (
+        <ResponsiveContainer width="100%" height={150}>
+          <BarChart data={data} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.06)" />
+            <XAxis dataKey="monthName" tick={AXIS_TICK} tickLine={false} axisLine={false} />
+            <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} tickFormatter={Y_TICK_FORMATTER} />
+            <Tooltip formatter={(value) => [formatCurrency(Number(value)), ""]} contentStyle={CHART_TOOLTIP_STYLE} />
+            <Legend wrapperStyle={{ fontSize: 10 }} formatter={(v) => (v === plannedKey ? "แผน" : "จริง")} />
+            <Bar dataKey={plannedKey} fill={`${color}55`} radius={[3, 3, 0, 0]} maxBarSize={12} />
+            <Bar dataKey={actualKey} fill={color} radius={[3, 3, 0, 0]} maxBarSize={12} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+
+function BudgetDashboardSection({
+  overview, comparison, loading, year,
+}: {
+  overview: MonthOverview[];
+  comparison: YearlyComparisonMonth[];
+  loading: boolean;
+  year: number;
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-28" />
+        <Skeleton className="h-72" />
+        <Skeleton className="h-56" />
+      </div>
+    );
+  }
+
+  const hasAnyBudget = overview.some(m => m.hasData);
+  if (!hasAnyBudget) return null;
+
+  const totals = overview.reduce((acc, m) => ({
+    income: acc.income + m.totalIncome,
+    expense: acc.expense + m.totalExpense,
+    liability: acc.liability + m.totalLiability,
+    saving: acc.saving + m.totalSaving,
+  }), { income: 0, expense: 0, liability: 0, saving: 0 });
+  const net = totals.income - totals.expense - totals.liability - totals.saving;
+  const totalsByType: Record<ItemType, number> = {
+    INCOME: totals.income, EXPENSE: totals.expense, LIABILITY: totals.liability, SAVING: totals.saving,
+  };
+
+  // Where the planned money goes — income isn't part of the "allocation"
+  const typeSlices = (
+    [
+      { key: "EXPENSE" as const, value: totals.expense, color: "#FF3B30" },
+      { key: "LIABILITY" as const, value: totals.liability, color: "#FF9500" },
+      { key: "SAVING" as const, value: totals.saving, color: "#007AFF" },
+    ]
+  ).filter(s => s.value > 0);
+  const outflowTotal = typeSlices.reduce((s, t) => s + t.value, 0);
+
+  return (
+    <div className="space-y-4">
+      <p className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide px-1">
+        ภาพรวมงบทั้งปี {year + 543}
+      </p>
+
+      {/* Yearly planned totals */}
+      <div className="ios-card px-4 py-3 space-y-1.5">
+        {(["INCOME", "EXPENSE", "LIABILITY", "SAVING"] as ItemType[]).map(type => {
+          const value = totalsByType[type];
+          if (value === 0) return null;
+          return (
+            <div key={type} className="flex justify-between text-[13px]">
+              <span className={TYPE_CONFIG[type].color}>{TYPE_CONFIG[type].emoji} {TYPE_CONFIG[type].label}</span>
+              <span className={cn("font-semibold tabular-nums", TYPE_CONFIG[type].color)}>
+                {type === "INCOME" ? "+" : "-"}{formatCurrency(value)}
+              </span>
+            </div>
+          );
+        })}
+        <div className="border-t border-border/50 pt-1.5 flex justify-between text-[14px] font-bold">
+          <span>คงเหลือสุทธิ (วางแผนทั้งปี)</span>
+          <span className={cn("tabular-nums", net >= 0 ? "text-primary" : "text-destructive")}>
+            {net >= 0 ? "+" : ""}{formatCurrency(net)}
+          </span>
+        </div>
+      </div>
+
+      {/* Plan vs actual */}
+      <div className="ios-card px-4 py-4 space-y-4">
+        <p className="text-[13px] font-semibold text-muted-foreground">แผนเทียบจริงรายเดือน</p>
+        <PlanVsActualChart data={comparison} plannedKey="plannedIncome" actualKey="actualIncome" label="รายรับ" color="#34C759" />
+        <PlanVsActualChart data={comparison} plannedKey="plannedExpense" actualKey="actualExpense" label="รายจ่าย" color="#FF3B30" />
+      </div>
+
+      {/* Proportion of planned outflow by type */}
+      {typeSlices.length > 0 && (
+        <div className="ios-card overflow-hidden">
+          <p className="text-[13px] font-semibold text-muted-foreground px-4 pt-4 pb-1">สัดส่วนงบที่วางแผนไว้ (ตามประเภท)</p>
+          <div className="px-4 pt-2">
+            <ResponsiveContainer width="100%" height={160}>
+              <PieChart>
+                <Pie data={typeSlices} dataKey="value" nameKey="key" cx="50%" cy="50%"
+                     innerRadius={48} outerRadius={72} paddingAngle={2} strokeWidth={0}>
+                  {typeSlices.map((s, i) => <Cell key={i} fill={s.color} />)}
+                </Pie>
+                <Tooltip formatter={(value) => [formatCurrency(Number(value)), ""]} contentStyle={CHART_TOOLTIP_STYLE} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="divide-y divide-border/50">
+            {typeSlices.map((s) => {
+              const pct = outflowTotal > 0 ? Math.round((s.value / outflowTotal) * 100) : 0;
+              return (
+                <div key={s.key} className="flex items-center gap-3 px-4 py-2.5">
+                  <span className="text-base shrink-0">{TYPE_CONFIG[s.key].emoji}</span>
+                  <p className="text-[13px] flex-1">{TYPE_CONFIG[s.key].label}</p>
+                  <p className="text-[13px] font-semibold tabular-nums">{formatCurrency(s.value)}</p>
+                  <p className="text-[11px] text-muted-foreground w-9 text-right">{pct}%</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Item Form ─────────────────────────────────────────────────────────────────
@@ -351,6 +513,8 @@ export default function BudgetPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [overview, setOverview] = useState<MonthOverview[]>([]);
   const [loadingOverview, setLoadingOverview] = useState(true);
+  const [yearlyComparison, setYearlyComparison] = useState<YearlyComparisonMonth[]>([]);
+  const [loadingYearlyComparison, setLoadingYearlyComparison] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
 
   // Month detail
@@ -397,6 +561,17 @@ export default function BudgetPage() {
   }, [year]);
 
   useEffect(() => { fetchOverview(); }, [fetchOverview]);
+
+  const fetchYearlyComparison = useCallback(async () => {
+    setLoadingYearlyComparison(true);
+    try {
+      const res = await fetch(`/api/v1/budgets/yearly-comparison?year=${year}`);
+      const d = await res.json();
+      if (d.success) setYearlyComparison(d.data);
+    } finally { setLoadingYearlyComparison(false); }
+  }, [year]);
+
+  useEffect(() => { fetchYearlyComparison(); }, [fetchYearlyComparison]);
 
   async function fetchDetail(month: number) {
     setLoadingDetail(true);
@@ -603,6 +778,14 @@ export default function BudgetPage() {
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
+
+      {/* Yearly dashboard */}
+      <BudgetDashboardSection
+        overview={overview}
+        comparison={yearlyComparison}
+        loading={loadingOverview || loadingYearlyComparison}
+        year={year}
+      />
 
       {/* 12-month grid */}
       {loadingOverview ? (

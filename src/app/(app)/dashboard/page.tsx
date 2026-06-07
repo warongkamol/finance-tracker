@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { ChevronLeft, ChevronRight, ChevronRight as ArrowRight, AlertCircle, Clock, Download, Image as ImageIcon, FileText, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronRight as ArrowRight, ChevronDown, AlertCircle, Clock, Download, Image as ImageIcon, FileText, Loader2 } from "lucide-react";
 import {
   ResponsiveContainer,
   PieChart,
@@ -35,15 +35,29 @@ interface Summary {
   overdueCount: number;
   personalDebts: { count: number; totalRemaining: number };
   familyDebts: { count: number; totalRemaining: number };
+  mineGroups?: {
+    personal: { income: number; expense: number; balance: number };
+    family: { income: number; expense: number; balance: number };
+  };
 }
 
-interface CategoryData {
+interface CategoryChildData {
   categoryId: string;
   name: string;
   icon: string | null;
   color: string | null;
   total: number;
-  percentage: number;
+  percentage: number; // relative to the parent category's total
+}
+
+interface CategoryData extends CategoryChildData {
+  // percentage here is relative to the grand total
+  children: CategoryChildData[];
+}
+
+interface CategorySplit {
+  personal: CategoryData[];
+  family: CategoryData[];
 }
 
 interface MonthlyData {
@@ -129,13 +143,109 @@ function BalanceHero({ summary, loading }: { summary: Summary | null; loading: b
   );
 }
 
+// ─── Mine: Personal vs Family Breakdown ──────────────────────────────────────
+
+function MineGroupSection({ summary, loading }: { summary: Summary | null; loading: boolean }) {
+  if (loading) return <Skeleton className="h-32" />;
+  if (!summary?.mineGroups) return null;
+
+  const groups = [
+    { key: "personal", label: "ส่วนตัว", emoji: "👤", data: summary.mineGroups.personal },
+    { key: "family", label: "ครอบครัว", emoji: "👨‍👩‍👧", data: summary.mineGroups.family },
+  ] as const;
+
+  // Hide a group with no activity (e.g. user has no family group / nothing tagged that way)
+  const visible = groups.filter((g) => g.data.income > 0 || g.data.expense > 0);
+  if (visible.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide px-1">
+        แยกตามกลุ่ม
+      </p>
+      <div className="ios-card overflow-hidden divide-y divide-border/50">
+        {visible.map((g) => {
+          const balPos = g.data.balance >= 0;
+          return (
+            <div key={g.key} className="px-4 py-3.5">
+              <div className="flex items-center gap-3 mb-2.5">
+                <div className="h-8 w-8 rounded-full bg-[#AF52DE]/10 flex items-center justify-center shrink-0 text-[14px]">
+                  {g.emoji}
+                </div>
+                <span className="text-[14px] font-semibold flex-1">{g.label}</span>
+                <p className={cn("text-[14px] font-bold tabular-nums", balPos ? "text-[#34C759]" : "text-[#FF3B30]")}>
+                  {balPos ? "+" : ""}{formatCurrency(g.data.balance)}
+                </p>
+              </div>
+              <div className={cn("grid gap-2", g.data.income > 0 && g.data.expense > 0 ? "grid-cols-2" : "grid-cols-1")}>
+                {g.data.income > 0 && (
+                  <div className="rounded-lg bg-[#34C759]/8 px-3 py-1.5">
+                    <p className="text-[10px] text-[#34C759] font-medium">รายรับ</p>
+                    <p className="text-[13px] font-semibold text-[#34C759] tabular-nums">{formatCurrency(g.data.income)}</p>
+                  </div>
+                )}
+                {g.data.expense > 0 && (
+                  <div className="rounded-lg bg-[#FF3B30]/8 px-3 py-1.5">
+                    <p className="text-[10px] text-[#FF3B30] font-medium">รายจ่าย</p>
+                    <p className="text-[13px] font-semibold text-[#FF3B30] tabular-nums">{formatCurrency(g.data.expense)}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Debt Banner ──────────────────────────────────────────────────────────────
 
-function DebtBanner({ summary, loading }: { summary: Summary | null; loading: boolean }) {
-  if (loading || !summary || summary.activeDebts === 0) return null;
+function FamilyDebtRow({ summary }: { summary: Summary }) {
+  return (
+    <Link href="/debts">
+      <div className="px-4 py-3.5 flex items-center justify-between active:opacity-70 transition-opacity">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-full bg-[#AF52DE]/12 flex items-center justify-center shrink-0">
+            <span className="text-base">👨‍👩‍👧</span>
+          </div>
+          <div>
+            <p className="text-[13px] font-medium text-muted-foreground">
+              หนี้สินครอบครัว · {summary.familyDebts.count} รายการ
+            </p>
+            <p className="text-[16px] font-bold text-[#AF52DE] tabular-nums">
+              {formatCurrency(summary.familyDebts.totalRemaining)}
+            </p>
+          </div>
+        </div>
+        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+      </div>
+    </Link>
+  );
+}
+
+function DebtBanner({ summary, loading, familyFilter }: { summary: Summary | null; loading: boolean; familyFilter: FamilyFilterType }) {
+  if (loading || !summary) return null;
 
   const hasPersonal = summary.personalDebts?.count > 0;
   const hasFamily = summary.familyDebts?.count > 0;
+
+  // Family tab — only family debts matter here; hide the section entirely if there are none
+  if (familyFilter === "family") {
+    if (!hasFamily) return null;
+    return (
+      <div className="ios-card overflow-hidden">
+        <FamilyDebtRow summary={summary} />
+        {summary.overdueCount > 0 && (
+          <div className="px-4 py-2 bg-destructive/5 text-center border-t border-border/50">
+            <span className="text-[12px] font-semibold text-destructive">⚠️ เลยกำหนด {summary.overdueCount} รายการ</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (summary.activeDebts === 0) return null;
 
   // No family debts — single row
   if (!hasFamily) {
@@ -191,24 +301,7 @@ function DebtBanner({ summary, loading }: { summary: Summary | null; loading: bo
           </div>
         </Link>
       )}
-      <Link href="/debts">
-        <div className="px-4 py-3.5 flex items-center justify-between active:opacity-70 transition-opacity">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-[#AF52DE]/12 flex items-center justify-center shrink-0">
-              <span className="text-base">👨‍👩‍👧</span>
-            </div>
-            <div>
-              <p className="text-[13px] font-medium text-muted-foreground">
-                หนี้สินครอบครัว · {summary.familyDebts.count} รายการ
-              </p>
-              <p className="text-[16px] font-bold text-[#AF52DE] tabular-nums">
-                {formatCurrency(summary.familyDebts.totalRemaining)}
-              </p>
-            </div>
-          </div>
-          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-        </div>
-      </Link>
+      <FamilyDebtRow summary={summary} />
       {summary.overdueCount > 0 && (
         <div className="px-4 py-2 bg-destructive/5 text-center border-t border-border/50">
           <span className="text-[12px] font-semibold text-destructive">⚠️ เลยกำหนด {summary.overdueCount} รายการ</span>
@@ -261,13 +354,15 @@ function UpcomingSection({ payments, loading }: { payments: UpcomingPayment[]; l
 
 // ─── Category Breakdown ───────────────────────────────────────────────────────
 
-function CategorySection({ data, loading }: { data: CategoryData[]; loading: boolean }) {
+function CategorySection({ title, data, loading }: { title: string; data: CategoryData[]; loading: boolean }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   if (loading) return <Skeleton className="h-64" />;
 
   return (
     <div className="space-y-2">
       <p className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide px-1">
-        รายจ่ายตามหมวดหมู่
+        {title}
       </p>
 
       {data.length === 0 ? (
@@ -303,34 +398,70 @@ function CategorySection({ data, loading }: { data: CategoryData[]; loading: boo
             </ResponsiveContainer>
           </div>
 
-          {/* List */}
+          {/* List — parent categories, tap to drill into subcategories */}
           <div className="divide-y divide-border/50">
-            {data.map((item, i) => (
-              <div key={item.categoryId} className="flex items-center gap-3 px-4 py-3">
-                <div
-                  className="h-8 w-8 rounded-full flex items-center justify-center text-[15px] shrink-0"
-                  style={{ backgroundColor: `${item.color ?? CHART_COLORS[i % CHART_COLORS.length]}18` }}
-                >
-                  {item.icon ?? "📌"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[14px] font-medium truncate">{item.name}</p>
-                  <div className="mt-1 h-1 bg-border/60 rounded-full overflow-hidden">
+            {data.map((item, i) => {
+              const fill = item.color ?? CHART_COLORS[i % CHART_COLORS.length];
+              const hasChildren = item.children.length > 0;
+              const expanded = expandedId === item.categoryId;
+
+              return (
+                <div key={item.categoryId}>
+                  <button
+                    type="button"
+                    onClick={() => hasChildren && setExpandedId(expanded ? null : item.categoryId)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
+                      hasChildren && "active:bg-muted/40"
+                    )}
+                  >
                     <div
-                      className="h-1 rounded-full transition-all"
-                      style={{
-                        width: `${item.percentage}%`,
-                        backgroundColor: item.color ?? CHART_COLORS[i % CHART_COLORS.length],
-                      }}
-                    />
-                  </div>
+                      className="h-8 w-8 rounded-full flex items-center justify-center text-[15px] shrink-0"
+                      style={{ backgroundColor: `${fill}18` }}
+                    >
+                      {item.icon ?? "📌"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] font-medium truncate">{item.name}</p>
+                      <div className="mt-1 h-1 bg-border/60 rounded-full overflow-hidden">
+                        <div
+                          className="h-1 rounded-full transition-all"
+                          style={{ width: `${item.percentage}%`, backgroundColor: fill }}
+                        />
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[14px] font-semibold tabular-nums">{formatCurrency(item.total)}</p>
+                      <p className="text-[11px] text-muted-foreground">{item.percentage}%</p>
+                    </div>
+                    {hasChildren && (
+                      <ChevronDown
+                        className={cn("h-4 w-4 text-muted-foreground shrink-0 transition-transform", expanded && "rotate-180")}
+                      />
+                    )}
+                  </button>
+
+                  {/* Subcategory drill-down */}
+                  {expanded && hasChildren && (
+                    <div className="bg-muted/30 divide-y divide-border/40">
+                      {item.children.map((child) => (
+                        <div key={child.categoryId} className="flex items-center gap-2.5 pl-12 pr-4 py-2.5">
+                          <div
+                            className="h-6 w-6 rounded-full flex items-center justify-center text-[12px] shrink-0"
+                            style={{ backgroundColor: `${child.color ?? fill}18` }}
+                          >
+                            {child.icon ?? "📌"}
+                          </div>
+                          <p className="text-[13px] flex-1 truncate text-muted-foreground">{child.name}</p>
+                          <p className="text-[13px] font-medium tabular-nums shrink-0">{formatCurrency(child.total)}</p>
+                          <p className="text-[11px] text-muted-foreground shrink-0 w-9 text-right">{child.percentage}%</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-[14px] font-semibold tabular-nums">{formatCurrency(item.total)}</p>
-                  <p className="text-[11px] text-muted-foreground">{item.percentage}%</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -492,6 +623,7 @@ export default function DashboardPage() {
 
   const [summary, setSummary] = useState<Summary | null>(null);
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [categorySplit, setCategorySplit] = useState<CategorySplit | null>(null);
   const [upcoming, setUpcoming] = useState<UpcomingPayment[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [trendData, setTrendData] = useState<TrendData | null>(null);
@@ -512,7 +644,15 @@ export default function DashboardPage() {
       ]);
       const [sumData, catData, upData] = await Promise.all([sumRes.json(), catRes.json(), upRes.json()]);
       if (sumData.success) setSummary(sumData.data);
-      if (catData.success) setCategoryData(catData.data);
+      if (catData.success) {
+        if (familyFilter === "mine") {
+          setCategorySplit(catData.data);
+          setCategoryData([]);
+        } else {
+          setCategoryData(catData.data);
+          setCategorySplit(null);
+        }
+      }
       if (upData.success) setUpcoming(upData.data);
     } finally {
       setLoadingMonth(false);
@@ -675,12 +815,24 @@ export default function DashboardPage() {
         {mode === "month" && (
           <>
             <BalanceHero summary={summary} loading={loadingMonth} />
-            <DebtBanner summary={summary} loading={loadingMonth} />
+            {familyFilter === "mine" && (
+              <MineGroupSection summary={summary} loading={loadingMonth} />
+            )}
+            <DebtBanner summary={summary} loading={loadingMonth} familyFilter={familyFilter} />
             {familyFilter === "family" && (
               <FamilyMemberSection data={familySummary} loading={loadingFamily} />
             )}
             <UpcomingSection payments={upcoming} loading={loadingMonth} />
-            <CategorySection data={categoryData} loading={loadingMonth} />
+            {familyFilter === "mine" ? (
+              <>
+                <CategorySection title="รายจ่ายตามหมวดหมู่ · ส่วนตัว" data={categorySplit?.personal ?? []} loading={loadingMonth} />
+                {!loadingMonth && (categorySplit?.family.length ?? 0) > 0 && (
+                  <CategorySection title="รายจ่ายตามหมวดหมู่ · ครอบครัว" data={categorySplit?.family ?? []} loading={false} />
+                )}
+              </>
+            ) : (
+              <CategorySection title="รายจ่ายตามหมวดหมู่" data={categoryData} loading={loadingMonth} />
+            )}
           </>
         )}
 

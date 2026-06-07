@@ -1,8 +1,105 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { TransactionType } from "@/generated/prisma/client";
+import { Prisma, TransactionType } from "@/generated/prisma/client";
 import { getFamilyMemberIds } from "@/lib/family";
+
+interface CategoryChildData {
+  categoryId: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+  total: number;
+  percentage: number; // relative to parent's total
+}
+
+interface CategoryData extends CategoryChildData {
+  // percentage here is relative to the grand total
+  children: CategoryChildData[];
+}
+
+// Groups transactions by category, rolling child categories up into their parent
+// (root) category, with a `children` breakdown for drill-down display.
+async function aggregateByCategory(where: Prisma.TransactionWhereInput): Promise<CategoryData[]> {
+  const grouped = await prisma.transaction.groupBy({
+    by: ["categoryId"],
+    where,
+    _sum: { amount: true },
+  });
+  if (grouped.length === 0) return [];
+
+  const categoryIds = grouped.map((g) => g.categoryId);
+  const categories = await prisma.category.findMany({
+    where: { id: { in: categoryIds } },
+    select: { id: true, name: true, icon: true, color: true, parentId: true },
+  });
+
+  // Some parents may not have direct transactions — fetch them too so we can group under them
+  const knownIds = new Set(categories.map((c) => c.id));
+  const missingParentIds = categories
+    .map((c) => c.parentId)
+    .filter((id): id is string => !!id && !knownIds.has(id));
+  const parentCategories = missingParentIds.length
+    ? await prisma.category.findMany({
+        where: { id: { in: missingParentIds } },
+        select: { id: true, name: true, icon: true, color: true, parentId: true },
+      })
+    : [];
+  const catMap = new Map([...categories, ...parentCategories].map((c) => [c.id, c]));
+
+  interface RootAgg {
+    id: string;
+    name: string;
+    icon: string | null;
+    color: string | null;
+    total: number;
+    children: Map<string, { id: string; name: string; icon: string | null; color: string | null; total: number }>;
+  }
+  const roots = new Map<string, RootAgg>();
+
+  for (const g of grouped) {
+    const amount = Number(g._sum.amount ?? 0);
+    const cat = catMap.get(g.categoryId);
+    if (!cat) continue;
+    const rootCat = cat.parentId ? catMap.get(cat.parentId) ?? cat : cat;
+
+    let root = roots.get(rootCat.id);
+    if (!root) {
+      root = { id: rootCat.id, name: rootCat.name, icon: rootCat.icon, color: rootCat.color, total: 0, children: new Map() };
+      roots.set(rootCat.id, root);
+    }
+    root.total += amount;
+
+    if (cat.parentId) {
+      const child = root.children.get(cat.id);
+      if (child) child.total += amount;
+      else root.children.set(cat.id, { id: cat.id, name: cat.name, icon: cat.icon, color: cat.color, total: amount });
+    }
+  }
+
+  const grandTotal = Array.from(roots.values()).reduce((sum, r) => sum + r.total, 0);
+
+  return Array.from(roots.values())
+    .sort((a, b) => b.total - a.total)
+    .map((r) => ({
+      categoryId: r.id,
+      name: r.name,
+      icon: r.icon,
+      color: r.color,
+      total: r.total,
+      percentage: grandTotal > 0 ? Math.round((r.total / grandTotal) * 100) : 0,
+      children: Array.from(r.children.values())
+        .sort((a, b) => b.total - a.total)
+        .map((c) => ({
+          categoryId: c.id,
+          name: c.name,
+          icon: c.icon,
+          color: c.color,
+          total: c.total,
+          percentage: r.total > 0 ? Math.round((c.total / r.total) * 100) : 0,
+        })),
+    }));
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,47 +121,27 @@ export async function GET(req: NextRequest) {
 
     const startDate = new Date(Date.UTC(year, month - 1, 1));
     const endDate = new Date(Date.UTC(year, month, 1));
+    const dateRange = { gte: startDate, lt: endDate };
 
-    let txUserIds: string[] = [session.user.id];
+    // "mine" now covers everything the user paid for (personal + family-tagged),
+    // split into two groups so each can be reviewed separately.
+    if (familyFilter === "mine") {
+      const [personal, family] = await Promise.all([
+        aggregateByCategory({ userId: session.user.id, type, isFamily: false, date: dateRange }),
+        aggregateByCategory({ userId: session.user.id, type, isFamily: true, date: dateRange }),
+      ]);
+      return NextResponse.json({ success: true, data: { personal, family } });
+    }
+
+    let where: Prisma.TransactionWhereInput;
     if (familyFilter === "family") {
-      txUserIds = await getFamilyMemberIds(session.user.id);
+      const txUserIds = await getFamilyMemberIds(session.user.id);
+      where = { userId: { in: txUserIds }, type, isFamily: true, date: dateRange };
+    } else {
+      where = { userId: session.user.id, type, date: dateRange };
     }
 
-    const where =
-      familyFilter === "family"
-        ? { userId: { in: txUserIds }, type, isFamily: true, date: { gte: startDate, lt: endDate } }
-        : familyFilter === "mine"
-        ? { userId: session.user.id, type, isFamily: false, date: { gte: startDate, lt: endDate } }
-        : { userId: session.user.id, type, date: { gte: startDate, lt: endDate } };
-
-    const grouped = await prisma.transaction.groupBy({
-      by: ["categoryId"],
-      where,
-      _sum: { amount: true },
-      orderBy: { _sum: { amount: "desc" } },
-    });
-
-    if (grouped.length === 0) {
-      return NextResponse.json({ success: true, data: [] });
-    }
-
-    const categories = await prisma.category.findMany({
-      where: { id: { in: grouped.map((g) => g.categoryId) } },
-      select: { id: true, name: true, icon: true, color: true },
-    });
-
-    const catMap = Object.fromEntries(categories.map((c) => [c.id, c]));
-    const total = grouped.reduce((sum, g) => sum + Number(g._sum.amount ?? 0), 0);
-
-    const data = grouped.map((g) => ({
-      categoryId: g.categoryId,
-      name: catMap[g.categoryId]?.name ?? "ไม่ทราบ",
-      icon: catMap[g.categoryId]?.icon ?? null,
-      color: catMap[g.categoryId]?.color ?? null,
-      total: Number(g._sum.amount ?? 0),
-      percentage: total > 0 ? Math.round((Number(g._sum.amount ?? 0) / total) * 100) : 0,
-    }));
-
+    const data = await aggregateByCategory(where);
     return NextResponse.json({ success: true, data });
   } catch {
     return NextResponse.json(
