@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { Pencil, Trash2, Plus, Check, X, Loader2, Users, LogOut, User, Copy, Link2, Link2Off, ChevronRight, BarChart2 } from "lucide-react";
+import { Pencil, Trash2, Plus, Check, X, Loader2, Users, LogOut, User, Copy, Link2, Link2Off, ChevronRight, BarChart2, FolderTree } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -451,6 +451,17 @@ export default function SettingsPage() {
           <span className="text-[14px] font-medium">เปลี่ยนรหัสผ่าน</span>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
+
+        <Link
+          href="/settings/categories"
+          className="w-full flex items-center justify-between px-4 py-3 border-t border-border/50 hover:bg-muted/50 transition-colors text-left"
+        >
+          <span className="flex items-center gap-2 text-[14px] font-medium">
+            <FolderTree className="h-4 w-4 text-muted-foreground" />
+            หมวดหมู่
+          </span>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </Link>
       </div>
 
       {/* ─── Family Group ─────────────────────────────────────────────────── */}
