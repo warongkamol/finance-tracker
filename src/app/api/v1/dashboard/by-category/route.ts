@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TransactionType } from "@/generated/prisma/client";
+import { getFamilyMemberIds } from "@/lib/family";
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,17 +20,26 @@ export async function GET(req: NextRequest) {
     const month = parseInt(searchParams.get("month") ?? String(now.getMonth() + 1));
     const typeParam = searchParams.get("type") ?? "EXPENSE";
     const type = (typeParam === "INCOME" ? "INCOME" : "EXPENSE") as TransactionType;
+    const familyFilter = searchParams.get("familyFilter"); // "mine" | "family" | "all"
 
     const startDate = new Date(Date.UTC(year, month - 1, 1));
     const endDate = new Date(Date.UTC(year, month, 1));
 
+    let txUserIds: string[] = [session.user.id];
+    if (familyFilter === "family") {
+      txUserIds = await getFamilyMemberIds(session.user.id);
+    }
+
+    const where =
+      familyFilter === "family"
+        ? { userId: { in: txUserIds }, type, isFamily: true, date: { gte: startDate, lt: endDate } }
+        : familyFilter === "mine"
+        ? { userId: session.user.id, type, isFamily: false, date: { gte: startDate, lt: endDate } }
+        : { userId: session.user.id, type, date: { gte: startDate, lt: endDate } };
+
     const grouped = await prisma.transaction.groupBy({
       by: ["categoryId"],
-      where: {
-        userId: session.user.id,
-        type,
-        date: { gte: startDate, lt: endDate },
-      },
+      where,
       _sum: { amount: true },
       orderBy: { _sum: { amount: "desc" } },
     });

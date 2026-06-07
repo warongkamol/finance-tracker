@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createTransactionSchema } from "@/lib/validations/transaction";
 import { TransactionType, Prisma } from "@/generated/prisma/client";
+import { checkBudgetAlert } from "@/lib/budget-alert";
+import { getFamilyMemberIds } from "@/lib/family";
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,6 +22,7 @@ export async function GET(req: NextRequest) {
     const typeParam = searchParams.get("type");
     const categoryIdParam = searchParams.get("categoryId");
     const searchQuery = searchParams.get("search");
+    const familyFilter = searchParams.get("familyFilter"); // "mine" | "family" | "all"
 
     const year = yearParam ? parseInt(yearParam) : new Date().getFullYear();
     const month = monthParam ? parseInt(monthParam) : new Date().getMonth() + 1;
@@ -27,10 +30,18 @@ export async function GET(req: NextRequest) {
     const startDate = new Date(Date.UTC(year, month - 1, 1));
     const endDate = new Date(Date.UTC(year, month, 1));
 
-    const where: Prisma.TransactionWhereInput = {
-      userId: session.user.id,
-      date: { gte: startDate, lt: endDate },
-    };
+    // Resolve userIds for family shared view
+    let txUserIds: string[] = [session.user.id];
+    if (familyFilter === "family") {
+      txUserIds = await getFamilyMemberIds(session.user.id);
+    }
+
+    const where: Prisma.TransactionWhereInput =
+      familyFilter === "family"
+        ? { userId: { in: txUserIds }, isFamily: true, date: { gte: startDate, lt: endDate } }
+        : familyFilter === "mine"
+        ? { userId: session.user.id, isFamily: false, date: { gte: startDate, lt: endDate } }
+        : { userId: session.user.id, date: { gte: startDate, lt: endDate } };
 
     if (typeParam === "INCOME" || typeParam === "EXPENSE") {
       where.type = typeParam as TransactionType;
@@ -51,6 +62,8 @@ export async function GET(req: NextRequest) {
         category: { select: { id: true, name: true, icon: true, color: true } },
         paymentMethod: { select: { id: true, name: true } },
         debtPayment: { select: { id: true, installmentNo: true, debt: { select: { id: true, name: true } } } },
+        familyMember: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true } },
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     });
@@ -83,7 +96,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { type, amount, description, date, categoryId, paymentMethodId } = parsed.data;
+    const { type, amount, description, date, categoryId, paymentMethodId, isFamily, familyMemberId } = parsed.data;
 
     const category = await prisma.category.findFirst({
       where: { id: categoryId, userId: session.user.id },
@@ -122,12 +135,24 @@ export async function POST(req: NextRequest) {
         categoryId,
         paymentMethodId: paymentMethodId ?? null,
         userId: session.user.id,
+        isFamily: isFamily ?? false,
+        familyMemberId: isFamily ? (familyMemberId ?? null) : null,
       },
       include: {
         category: { select: { id: true, name: true, icon: true, color: true } },
         paymentMethod: { select: { id: true, name: true } },
+        familyMember: { select: { id: true, name: true } },
       },
     });
+
+    // Fire-and-forget budget alert check for EXPENSE transactions
+    if (type === "EXPENSE") {
+      checkBudgetAlert({
+        userId: session.user.id,
+        categoryId,
+        txDate: new Date(date),
+      }).catch(console.error);
+    }
 
     return NextResponse.json({ success: true, data: transaction }, { status: 201 });
   } catch {

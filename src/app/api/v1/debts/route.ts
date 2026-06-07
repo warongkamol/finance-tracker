@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { name, totalAmount, totalMonths, monthlyAmount, startDate, notes } = parsed.data;
+    const isFamily = typeof body.isFamily === "boolean" ? body.isFamily : false;
 
     const effectiveMonthly = monthlyAmount ?? totalAmount / totalMonths;
     const start = new Date(startDate);
@@ -92,6 +93,7 @@ export async function POST(req: NextRequest) {
           startDate: start,
           endDate: end,
           notes: notes ?? null,
+          isFamily: isFamily ?? false,
           userId: session.user.id,
           status: "ACTIVE",
         },

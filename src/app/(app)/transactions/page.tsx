@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Plus, ChevronLeft, ChevronRight, Search, Trash2, Pencil, AlertCircle, Clock, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
+import { Plus, ChevronLeft, ChevronRight, Search, Trash2, Pencil, AlertCircle, Clock, Loader2, FileDown } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TransactionForm } from "@/components/forms/transaction-form";
 import { formatCurrency, formatShortDate, getMonthName, getCurrentMonth, cn } from "@/lib/utils";
+import { buildFilename, captureAsPDF } from "@/lib/export";
 import Link from "next/link";
 
 interface UpcomingPayment {
@@ -23,6 +25,7 @@ interface UpcomingPayment {
 
 interface Transaction {
   id: string;
+  userId: string;
   type: "INCOME" | "EXPENSE";
   amount: string;
   description: string | null;
@@ -33,6 +36,9 @@ interface Transaction {
   paymentMethod: { id: string; name: string } | null;
   debtPaymentId: string | null;
   debtPayment: { id: string; installmentNo: number; debt: { id: string; name: string } } | null;
+  isFamily: boolean;
+  familyMember: { id: string; name: string } | null;
+  user: { id: string; name: string };
 }
 
 interface Summary {
@@ -42,6 +48,7 @@ interface Summary {
 }
 
 type FilterType = "ALL" | "INCOME" | "EXPENSE";
+type FamilyFilterType = "all" | "mine" | "family";
 
 function groupByDate(transactions: Transaction[]): Record<string, Transaction[]> {
   return transactions.reduce<Record<string, Transaction[]>>((acc, tx) => {
@@ -72,10 +79,12 @@ function TransactionSkeleton() {
 }
 
 export default function TransactionsPage() {
+  const { data: session } = useSession();
   const now = getCurrentMonth();
   const [year, setYear] = useState(now.year);
   const [month, setMonth] = useState(now.month);
   const [filter, setFilter] = useState<FilterType>("ALL");
+  const [familyFilter, setFamilyFilter] = useState<FamilyFilterType>("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -84,6 +93,9 @@ export default function TransactionsPage() {
   const [upcomingPayments, setUpcomingPayments] = useState<UpcomingPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [payingId, setPayingId] = useState<string | null>(null);
+
+  const printRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
@@ -103,6 +115,7 @@ export default function TransactionsPage() {
         month: String(month),
         ...(filter !== "ALL" && { type: filter }),
         ...(debouncedSearch && { search: debouncedSearch }),
+        ...(familyFilter !== "all" && { familyFilter }),
       });
 
       const [txRes, sumRes, upRes] = await Promise.all([
@@ -118,7 +131,7 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [year, month, filter, debouncedSearch]);
+  }, [year, month, filter, familyFilter, debouncedSearch]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -155,6 +168,23 @@ export default function TransactionsPage() {
     }
   }
 
+  async function handleExportPDF() {
+    if (!printRef.current || isExporting) return;
+    setIsExporting(true);
+    printRef.current.style.visibility = "visible";
+    printRef.current.style.pointerEvents = "none";
+    try {
+      const filename = buildFilename("transactions", year, month);
+      await captureAsPDF(printRef.current, filename);
+    } finally {
+      if (printRef.current) {
+        printRef.current.style.visibility = "hidden";
+        printRef.current.style.pointerEvents = "none";
+      }
+      setIsExporting(false);
+    }
+  }
+
   const pendingPayments = upcomingPayments.filter((p) => p.status !== "PAID");
   const grouped = groupByDate(transactions);
   const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
@@ -167,9 +197,19 @@ export default function TransactionsPage() {
           <ChevronLeft className="h-5 w-5 text-muted-foreground" />
         </button>
         <span className="text-[16px] font-semibold">{getMonthName(month)} {year}</span>
-        <button onClick={nextMonth} className="h-8 w-8 rounded-full hover:bg-card flex items-center justify-center active:scale-90 transition-all">
-          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleExportPDF}
+            disabled={isExporting || loading || transactions.length === 0}
+            className="h-8 w-8 rounded-full hover:bg-card flex items-center justify-center active:scale-90 transition-all disabled:opacity-40"
+            title="Export PDF"
+          >
+            {isExporting ? <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" /> : <FileDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+          <button onClick={nextMonth} className="h-8 w-8 rounded-full hover:bg-card flex items-center justify-center active:scale-90 transition-all">
+            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+          </button>
+        </div>
       </div>
 
       {/* Summary */}
@@ -199,7 +239,7 @@ export default function TransactionsPage() {
         />
       </div>
 
-      {/* Filter */}
+      {/* Type filter */}
       <div className="ios-card p-1 grid grid-cols-3 gap-1">
         {(["ALL", "EXPENSE", "INCOME"] as FilterType[]).map((f) => (
           <button
@@ -211,6 +251,26 @@ export default function TransactionsPage() {
             )}
           >
             {f === "ALL" ? "ทั้งหมด" : f === "INCOME" ? "รายรับ" : "รายจ่าย"}
+          </button>
+        ))}
+      </div>
+
+      {/* Family filter */}
+      <div className="ios-card p-1 grid grid-cols-3 gap-1">
+        {([
+          { key: "all", label: "ทุกรายการ" },
+          { key: "mine", label: "ของฉัน" },
+          { key: "family", label: "ครอบครัว" },
+        ] as { key: FamilyFilterType; label: string }[]).map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setFamilyFilter(key)}
+            className={cn(
+              "py-1.5 rounded-xl text-[13px] font-semibold transition-all",
+              familyFilter === key ? "bg-[#AF52DE] text-white shadow-sm" : "text-muted-foreground"
+            )}
+          >
+            {label}
           </button>
         ))}
       </div>
@@ -279,11 +339,16 @@ export default function TransactionsPage() {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="text-[14px] font-medium truncate">{tx.category.name}</p>
                         {tx.debtPayment && (
                           <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#FF9500]/15 text-[#FF9500]">
                             💳 งวด {tx.debtPayment.installmentNo}
+                          </span>
+                        )}
+                        {tx.isFamily && (
+                          <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#AF52DE]/15 text-[#AF52DE]">
+                            👨‍👩‍👧 {tx.familyMember?.name ?? (tx.userId !== session?.user?.id ? tx.user.name : "ครอบครัว")}
                           </span>
                         )}
                       </div>
@@ -322,6 +387,94 @@ export default function TransactionsPage() {
           ))}
         </div>
       )}
+
+      {/* Hidden print view — captured by html2canvas for PDF export */}
+      <div
+        ref={printRef}
+        style={{
+          position: "fixed",
+          left: "-9999px",
+          top: 0,
+          width: "800px",
+          background: "#ffffff",
+          color: "#000000",
+          padding: "32px",
+          fontFamily: "sans-serif",
+          visibility: "hidden",
+          pointerEvents: "none",
+          zIndex: -1,
+        }}
+      >
+        {/* Header */}
+        <div style={{ borderBottom: "2px solid #007AFF", paddingBottom: "12px", marginBottom: "16px" }}>
+          <div style={{ fontSize: "20px", fontWeight: 700, color: "#007AFF" }}>รายการธุรกรรม</div>
+          <div style={{ fontSize: "14px", color: "#666", marginTop: "4px" }}>{getMonthName(month)} {year}</div>
+        </div>
+
+        {/* Summary row */}
+        {summary && (
+          <div style={{ display: "flex", gap: "16px", marginBottom: "20px" }}>
+            {[
+              { label: "รายรับ", value: summary.totalIncome, color: "#34C759" },
+              { label: "รายจ่าย", value: summary.totalExpense, color: "#FF3B30" },
+              { label: "คงเหลือ", value: summary.balance, color: summary.balance >= 0 ? "#007AFF" : "#FF9500" },
+            ].map(({ label, value, color }) => (
+              <div key={label} style={{ flex: 1, background: "#f5f5f7", borderRadius: "10px", padding: "12px 16px" }}>
+                <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px" }}>{label}</div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color }}>{formatCurrency(value)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Table */}
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+          <thead>
+            <tr style={{ background: "#007AFF", color: "#fff" }}>
+              {["วันที่", "หมวดหมู่", "รายละเอียด", "ช่องทาง", "ประเภท", "จำนวนเงิน"].map((h) => (
+                <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 600 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {transactions.map((tx, i) => (
+              <tr key={tx.id} style={{ background: i % 2 === 0 ? "#fff" : "#f9f9fb" }}>
+                <td style={{ padding: "7px 10px", borderBottom: "1px solid #eee", whiteSpace: "nowrap" }}>
+                  {formatShortDate(tx.date)}
+                </td>
+                <td style={{ padding: "7px 10px", borderBottom: "1px solid #eee" }}>
+                  {tx.category.icon ?? ""} {tx.category.name}
+                </td>
+                <td style={{ padding: "7px 10px", borderBottom: "1px solid #eee", color: "#555" }}>
+                  {tx.debtPayment
+                    ? `${tx.debtPayment.debt.name} งวด${tx.debtPayment.installmentNo}`
+                    : (tx.description ?? "-")}
+                </td>
+                <td style={{ padding: "7px 10px", borderBottom: "1px solid #eee", color: "#555" }}>
+                  {tx.paymentMethod?.name ?? "-"}
+                </td>
+                <td style={{ padding: "7px 10px", borderBottom: "1px solid #eee" }}>
+                  <span style={{
+                    fontSize: "11px", fontWeight: 600, padding: "2px 8px", borderRadius: "999px",
+                    background: tx.type === "INCOME" ? "#34C75918" : "#FF3B3018",
+                    color: tx.type === "INCOME" ? "#34C759" : "#FF3B30",
+                  }}>
+                    {tx.type === "INCOME" ? "รายรับ" : "รายจ่าย"}
+                  </span>
+                </td>
+                <td style={{ padding: "7px 10px", borderBottom: "1px solid #eee", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>
+                  {tx.type === "INCOME" ? "+" : "−"}{formatCurrency(parseFloat(tx.amount))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Footer */}
+        <div style={{ marginTop: "16px", fontSize: "11px", color: "#aaa", textAlign: "right" }}>
+          {transactions.length} รายการ · ส่งออก {new Date().toLocaleDateString("th-TH")}
+        </div>
+      </div>
 
       {/* FAB */}
       <button

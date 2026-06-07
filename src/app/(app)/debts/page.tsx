@@ -65,15 +65,18 @@ export default function DebtsPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deletingDebt, setDeletingDebt] = useState<Debt | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [inFamilyGroup, setInFamilyGroup] = useState(false);
 
   const fetchDebts = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/v1/debts?status=${tab}`);
-      const data = await res.json();
-      if (data.success) {
-        setDebts(data.data);
-      }
+      const [debtRes, familyRes] = await Promise.all([
+        fetch(`/api/v1/debts?status=${tab}`),
+        fetch("/api/v1/family"),
+      ]);
+      const [debtData, familyData] = await Promise.all([debtRes.json(), familyRes.json()]);
+      if (debtData.success) setDebts(debtData.data);
+      if (familyData.success) setInFamilyGroup(!!familyData.data?.group);
     } finally {
       setLoading(false);
     }
@@ -196,6 +199,7 @@ export default function DebtsPage() {
           <DebtForm
             onSuccess={() => { setSheetOpen(false); fetchDebts(); }}
             onCancel={() => setSheetOpen(false)}
+            inFamilyGroup={inFamilyGroup}
           />
         </SheetContent>
       </Sheet>

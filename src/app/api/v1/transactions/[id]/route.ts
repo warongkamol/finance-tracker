@@ -70,7 +70,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       );
     }
 
-    const { type, amount, description, date, categoryId, paymentMethodId } = parsed.data;
+    const { type, amount, description, date, categoryId, paymentMethodId, isFamily, familyMemberId } = parsed.data;
     const effectiveType = type ?? existing.type;
 
     if (categoryId) {
@@ -110,6 +110,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (date !== undefined) updateData.date = new Date(date);
     if (categoryId !== undefined) updateData.categoryId = categoryId;
     if (paymentMethodId !== undefined) updateData.paymentMethodId = paymentMethodId;
+    if (isFamily !== undefined) {
+      updateData.isFamily = isFamily;
+      updateData.familyMemberId = isFamily ? (familyMemberId ?? null) : null;
+    }
 
     const transaction = await prisma.transaction.update({
       where: { id },
@@ -117,6 +121,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       include: {
         category: { select: { id: true, name: true, icon: true, color: true } },
         paymentMethod: { select: { id: true, name: true } },
+        familyMember: { select: { id: true, name: true } },
       },
     });
 

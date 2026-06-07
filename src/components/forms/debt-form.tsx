@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 interface DebtFormProps {
   onSuccess: () => void;
   onCancel: () => void;
+  inFamilyGroup?: boolean;
 }
 
 function todayString(): string {
@@ -31,9 +32,10 @@ function FormRow({ label, error, children }: { label: string; error?: string; ch
 
 const fieldClass = "bg-input h-11 rounded-xl border-0";
 
-export function DebtForm({ onSuccess, onCancel }: DebtFormProps) {
+export function DebtForm({ onSuccess, onCancel, inFamilyGroup = false }: DebtFormProps) {
   const [serverError, setServerError] = useState("");
   const [useCustomMonthly, setUseCustomMonthly] = useState(false);
+  const [isFamily, setIsFamily] = useState(false);
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<CreateDebtInput>({
     resolver: zodResolver(createDebtSchema),
@@ -49,7 +51,11 @@ export function DebtForm({ onSuccess, onCancel }: DebtFormProps) {
   async function onSubmit(data: CreateDebtInput) {
     setServerError("");
     try {
-      const payload = { ...data, monthlyAmount: useCustomMonthly ? data.monthlyAmount : null };
+      const payload = {
+        ...data,
+        monthlyAmount: useCustomMonthly ? data.monthlyAmount : null,
+        isFamily,
+      };
       const res = await fetch("/api/v1/debts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -96,16 +102,10 @@ export function DebtForm({ onSuccess, onCancel }: DebtFormProps) {
         <div className="space-y-2">
           <label className="flex items-center gap-2.5 cursor-pointer select-none">
             <div
-              className={cn(
-                "w-11 h-6 rounded-full transition-colors relative",
-                useCustomMonthly ? "bg-primary" : "bg-border"
-              )}
+              className={cn("w-11 h-6 rounded-full transition-colors relative", useCustomMonthly ? "bg-primary" : "bg-border")}
               onClick={() => setUseCustomMonthly((v) => !v)}
             >
-              <div className={cn(
-                "absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform",
-                useCustomMonthly ? "translate-x-5.5" : "translate-x-0.5"
-              )} />
+              <div className={cn("absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform", useCustomMonthly ? "translate-x-5.5" : "translate-x-0.5")} />
             </div>
             <span className="text-[14px] font-medium">กำหนดยอดต่องวดเอง</span>
           </label>
@@ -124,6 +124,31 @@ export function DebtForm({ onSuccess, onCancel }: DebtFormProps) {
         <FormRow label="หมายเหตุ">
           <Input placeholder="เช่น บัตรกรุงไทย 0% ดอกเบี้ย" className={fieldClass} {...register("notes")} />
         </FormRow>
+
+        {/* Family toggle — only shown when in a family group */}
+        {inFamilyGroup && (
+          <div className="pt-1 border-t border-border/40">
+            <label className="flex items-center justify-between cursor-pointer select-none">
+              <div>
+                <p className="text-[14px] font-medium">หนี้สินครอบครัว</p>
+                <p className="text-[12px] text-muted-foreground">แสดงในหน้าสรุปของทุกคนในกลุ่ม</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFamily((v) => !v)}
+                className={cn(
+                  "relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors",
+                  isFamily ? "bg-[#AF52DE]" : "bg-border"
+                )}
+              >
+                <span className={cn(
+                  "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
+                  isFamily ? "translate-x-5.5" : "translate-x-0.5"
+                )} />
+              </button>
+            </label>
+          </div>
+        )}
       </div>
 
       {serverError && <p className="text-[14px] text-destructive text-center">{serverError}</p>}

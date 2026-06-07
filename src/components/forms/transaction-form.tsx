@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { Loader2, Users } from "lucide-react";
 
 interface Category {
   id: string;
@@ -19,6 +19,11 @@ interface Category {
 }
 
 interface PaymentMethod {
+  id: string;
+  name: string;
+}
+
+interface FamilyMember {
   id: string;
   name: string;
 }
@@ -40,6 +45,9 @@ interface TransactionFormProps {
     date: string;
     categoryId: string;
     paymentMethodId: string | null;
+    isFamily?: boolean;
+    familyMemberId?: string | null;
+    familyMember?: { id: string; name: string } | null;
   };
   prefill?: PrefillValues;
   onSuccess: () => void;
@@ -70,6 +78,9 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
   const [txType, setTxType] = useState<"INCOME" | "EXPENSE">(defaultValues?.type ?? prefill?.type ?? "EXPENSE");
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [isFamily, setIsFamily] = useState(defaultValues?.isFamily ?? false);
+  const [familyMemberId, setFamilyMemberId] = useState<string | null>(defaultValues?.familyMemberId ?? null);
   const [loadingData, setLoadingData] = useState(true);
   const [serverError, setServerError] = useState("");
 
@@ -90,14 +101,17 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
   useEffect(() => {
     async function loadData() {
       try {
-        const [catRes, pmRes] = await Promise.all([
+        const [catRes, pmRes, fmRes] = await Promise.all([
           fetch("/api/v1/categories"),
           fetch("/api/v1/payment-methods"),
+          fetch("/api/v1/family-members"),
         ]);
         const catData = await catRes.json();
         const pmData = await pmRes.json();
+        const fmData = await fmRes.json();
         if (catData.success) setCategories(catData.data);
         if (pmData.success) setPaymentMethods(pmData.data);
+        if (fmData.success) setFamilyMembers(fmData.data);
       } finally {
         setLoadingData(false);
       }
@@ -120,7 +134,11 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
       const res = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          isFamily,
+          familyMemberId: isFamily ? familyMemberId : null,
+        }),
       });
       const json = await res.json();
       if (!json.success) { setServerError(json.error?.message ?? "เกิดข้อผิดพลาด"); return; }
@@ -236,6 +254,44 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
         <FormRow label="หมายเหตุ">
           <Input placeholder="เช่น ค่าข้าวกลางวัน" className="bg-input h-11 rounded-xl border-0" {...register("description")} />
         </FormRow>
+
+        {/* Family toggle */}
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <span className="text-[13px] font-medium text-muted-foreground">รายการครอบครัว</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setIsFamily((v) => !v); if (isFamily) setFamilyMemberId(null); }}
+            className={cn(
+              "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
+              isFamily ? "bg-primary" : "bg-input"
+            )}
+          >
+            <span className={cn(
+              "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transform transition-transform",
+              isFamily ? "translate-x-5" : "translate-x-0"
+            )} />
+          </button>
+        </div>
+
+        {isFamily && familyMembers.length > 0 && (
+          <Select
+            value={familyMemberId ?? "none"}
+            onValueChange={(val) => setFamilyMemberId(val === "none" ? null : val)}
+          >
+            <SelectTrigger className="bg-input h-11 rounded-xl border-0">
+              <SelectValue placeholder="เลือกสมาชิก (ไม่บังคับ)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">ไม่ระบุสมาชิก</SelectItem>
+              {familyMembers.map((m) => (
+                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {serverError && <p className="text-[14px] text-destructive text-center">{serverError}</p>}

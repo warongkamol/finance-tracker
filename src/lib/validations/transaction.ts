@@ -10,6 +10,8 @@ export const createTransactionSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ไม่ถูกต้อง"),
   categoryId: z.string().min(1, "กรุณาเลือกหมวดหมู่"),
   paymentMethodId: z.string().min(1).nullable().optional(),
+  isFamily: z.boolean().optional(),
+  familyMemberId: z.string().min(1).nullable().optional(),
 });
 
 export const updateTransactionSchema = createTransactionSchema.partial();

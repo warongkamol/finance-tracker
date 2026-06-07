@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { ChevronLeft, ChevronRight, ChevronRight as ArrowRight, AlertCircle, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronRight as ArrowRight, AlertCircle, Clock, Download, Image as ImageIcon, FileText, Loader2 } from "lucide-react";
 import {
   ResponsiveContainer,
   PieChart,
@@ -19,7 +19,10 @@ import {
   Line,
 } from "recharts";
 import { formatCurrency, getMonthName, getCurrentMonth, cn } from "@/lib/utils";
+import { buildFilename, captureAsImage, captureAsPDF } from "@/lib/export";
 import Link from "next/link";
+
+type FamilyFilterType = "all" | "mine" | "family";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +33,8 @@ interface Summary {
   activeDebts: number;
   totalRemainingDebt: number;
   overdueCount: number;
+  personalDebts: { count: number; totalRemaining: number };
+  familyDebts: { count: number; totalRemaining: number };
 }
 
 interface CategoryData {
@@ -51,6 +56,20 @@ interface MonthlyData {
 interface TrendData {
   data: Record<string, number | string>[];
   categories: { name: string; color: string }[];
+}
+
+interface MemberSummary {
+  userId: string;
+  name: string;
+  isMe: boolean;
+  income: number;
+  expense: number;
+  balance: number;
+}
+
+interface FamilySummary {
+  members: MemberSummary[];
+  totals: { income: number; expense: number; balance: number };
 }
 
 interface UpcomingPayment {
@@ -115,32 +134,87 @@ function BalanceHero({ summary, loading }: { summary: Summary | null; loading: b
 function DebtBanner({ summary, loading }: { summary: Summary | null; loading: boolean }) {
   if (loading || !summary || summary.activeDebts === 0) return null;
 
-  return (
-    <Link href="/debts">
-      <div className="ios-card px-4 py-3.5 flex items-center justify-between active:opacity-70 transition-opacity">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-[#FF9500]/12 flex items-center justify-center shrink-0">
-            <span className="text-base">💳</span>
+  const hasPersonal = summary.personalDebts?.count > 0;
+  const hasFamily = summary.familyDebts?.count > 0;
+
+  // No family debts — single row
+  if (!hasFamily) {
+    return (
+      <Link href="/debts">
+        <div className="ios-card px-4 py-3.5 flex items-center justify-between active:opacity-70 transition-opacity">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-full bg-[#FF9500]/12 flex items-center justify-center shrink-0">
+              <span className="text-base">💳</span>
+            </div>
+            <div>
+              <p className="text-[13px] font-medium text-muted-foreground">
+                หนี้สินคงค้าง · {summary.activeDebts} รายการ
+              </p>
+              <p className="text-[16px] font-bold text-[#FF9500] tabular-nums">
+                {formatCurrency(summary.totalRemainingDebt)}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-[13px] font-medium text-muted-foreground">
-              หนี้สินคงค้าง · {summary.activeDebts} รายการ
-            </p>
-            <p className="text-[16px] font-bold text-[#FF9500] tabular-nums">
-              {formatCurrency(summary.totalRemainingDebt)}
-            </p>
+          <div className="flex items-center gap-1.5">
+            {summary.overdueCount > 0 && (
+              <span className="text-[11px] font-semibold text-destructive bg-destructive/10 rounded-full px-2 py-0.5">
+                เลยกำหนด {summary.overdueCount}
+              </span>
+            )}
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          {summary.overdueCount > 0 && (
-            <span className="text-[11px] font-semibold text-destructive bg-destructive/10 rounded-full px-2 py-0.5">
-              เลยกำหนด {summary.overdueCount}
-            </span>
-          )}
+      </Link>
+    );
+  }
+
+  // Split view: personal + family rows
+  return (
+    <div className="ios-card overflow-hidden">
+      {hasPersonal && (
+        <Link href="/debts">
+          <div className="px-4 py-3.5 flex items-center justify-between active:opacity-70 transition-opacity border-b border-border/50">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-full bg-[#FF9500]/12 flex items-center justify-center shrink-0">
+                <span className="text-base">💳</span>
+              </div>
+              <div>
+                <p className="text-[13px] font-medium text-muted-foreground">
+                  หนี้สินส่วนตัว · {summary.personalDebts.count} รายการ
+                </p>
+                <p className="text-[16px] font-bold text-[#FF9500] tabular-nums">
+                  {formatCurrency(summary.personalDebts.totalRemaining)}
+                </p>
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          </div>
+        </Link>
+      )}
+      <Link href="/debts">
+        <div className="px-4 py-3.5 flex items-center justify-between active:opacity-70 transition-opacity">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-full bg-[#AF52DE]/12 flex items-center justify-center shrink-0">
+              <span className="text-base">👨‍👩‍👧</span>
+            </div>
+            <div>
+              <p className="text-[13px] font-medium text-muted-foreground">
+                หนี้สินครอบครัว · {summary.familyDebts.count} รายการ
+              </p>
+              <p className="text-[16px] font-bold text-[#AF52DE] tabular-nums">
+                {formatCurrency(summary.familyDebts.totalRemaining)}
+              </p>
+            </div>
+          </div>
           <ArrowRight className="h-4 w-4 text-muted-foreground" />
         </div>
-      </div>
-    </Link>
+      </Link>
+      {summary.overdueCount > 0 && (
+        <div className="px-4 py-2 bg-destructive/5 text-center border-t border-border/50">
+          <span className="text-[12px] font-semibold text-destructive">⚠️ เลยกำหนด {summary.overdueCount} รายการ</span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -335,6 +409,64 @@ function TrendChart({ trend, loading }: { trend: TrendData | null; loading: bool
   );
 }
 
+// ─── Family Member Section ────────────────────────────────────────────────────
+
+function FamilyMemberSection({ data, loading }: { data: FamilySummary | null; loading: boolean }) {
+  if (loading) return <Skeleton className="h-40" />;
+  if (!data || data.members.length === 0) return null;
+
+  const totalExpense = data.totals.expense;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide px-1">
+        สรุปตามสมาชิก
+      </p>
+      <div className="ios-card overflow-hidden divide-y divide-border/50">
+        {data.members.map((m) => {
+          const pct = totalExpense > 0 ? Math.round((m.expense / totalExpense) * 100) : 0;
+          const balPos = m.balance >= 0;
+          return (
+            <div key={m.userId} className="px-4 py-3.5">
+              <div className="flex items-center gap-3 mb-2.5">
+                <div className="h-8 w-8 rounded-full bg-[#AF52DE]/10 flex items-center justify-center shrink-0 text-[14px]">
+                  {m.isMe ? "👤" : "👥"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[14px] font-semibold">{m.name}</span>
+                  {m.isMe && <span className="ml-1.5 text-[11px] text-muted-foreground">(คุณ)</span>}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className={cn("text-[14px] font-bold tabular-nums", balPos ? "text-[#34C759]" : "text-[#FF3B30]")}>
+                    {balPos ? "+" : ""}{formatCurrency(m.balance)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <div className="rounded-lg bg-[#34C759]/8 px-3 py-1.5">
+                  <p className="text-[10px] text-[#34C759] font-medium">รายรับ</p>
+                  <p className="text-[13px] font-semibold text-[#34C759] tabular-nums">{formatCurrency(m.income)}</p>
+                </div>
+                <div className="rounded-lg bg-[#FF3B30]/8 px-3 py-1.5">
+                  <p className="text-[10px] text-[#FF3B30] font-medium">รายจ่าย {pct > 0 && `· ${pct}%`}</p>
+                  <p className="text-[13px] font-semibold text-[#FF3B30] tabular-nums">{formatCurrency(m.expense)}</p>
+                </div>
+              </div>
+
+              {totalExpense > 0 && (
+                <div className="h-1 bg-border/50 rounded-full overflow-hidden">
+                  <div className="h-full bg-[#AF52DE] rounded-full" style={{ width: `${pct}%` }} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 type ViewMode = "month" | "year";
@@ -346,22 +478,30 @@ export default function DashboardPage() {
   const [mode, setMode] = useState<ViewMode>("month");
   const [year, setYear] = useState(now.year);
   const [month, setMonth] = useState(now.month);
+  const [familyFilter, setFamilyFilter] = useState<FamilyFilterType>("all");
+
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   const [summary, setSummary] = useState<Summary | null>(null);
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
   const [upcoming, setUpcoming] = useState<UpcomingPayment[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [trendData, setTrendData] = useState<TrendData | null>(null);
+  const [familySummary, setFamilySummary] = useState<FamilySummary | null>(null);
+  const [loadingFamily, setLoadingFamily] = useState(false);
 
   const [loadingMonth, setLoadingMonth] = useState(true);
   const [loadingYear, setLoadingYear] = useState(true);
 
   const fetchMonthData = useCallback(async () => {
     setLoadingMonth(true);
+    const ff = familyFilter !== "all" ? `&familyFilter=${familyFilter}` : "";
     try {
       const [sumRes, catRes, upRes] = await Promise.all([
-        fetch(`/api/v1/dashboard/summary?year=${year}&month=${month}`),
-        fetch(`/api/v1/dashboard/by-category?year=${year}&month=${month}&type=EXPENSE`),
+        fetch(`/api/v1/dashboard/summary?year=${year}&month=${month}${ff}`),
+        fetch(`/api/v1/dashboard/by-category?year=${year}&month=${month}&type=EXPENSE${ff}`),
         fetch(`/api/v1/debts/upcoming?year=${year}&month=${month}`),
       ]);
       const [sumData, catData, upData] = await Promise.all([sumRes.json(), catRes.json(), upRes.json()]);
@@ -371,7 +511,7 @@ export default function DashboardPage() {
     } finally {
       setLoadingMonth(false);
     }
-  }, [year, month]);
+  }, [year, month, familyFilter]);
 
   const fetchYearData = useCallback(async () => {
     setLoadingYear(true);
@@ -390,6 +530,28 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchMonthData(); }, [fetchMonthData]);
   useEffect(() => { if (mode === "year") fetchYearData(); }, [mode, fetchYearData]);
+
+  useEffect(() => {
+    if (familyFilter !== "family") { setFamilySummary(null); return; }
+    setLoadingFamily(true);
+    fetch(`/api/v1/family/summary?year=${year}&month=${month}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setFamilySummary(d.data); })
+      .finally(() => setLoadingFamily(false));
+  }, [familyFilter, year, month]);
+
+  async function handleExport(format: "image" | "pdf") {
+    if (!contentRef.current || isExporting) return;
+    setExportMenuOpen(false);
+    setIsExporting(true);
+    try {
+      const filename = buildFilename("dashboard", year, mode === "month" ? month : undefined);
+      if (format === "image") await captureAsImage(contentRef.current, filename);
+      else await captureAsPDF(contentRef.current, filename);
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   function prevPeriod() {
     if (mode === "month") {
@@ -411,56 +573,119 @@ export default function DashboardPage() {
 
   return (
     <div className="py-5 space-y-5">
-      {/* Greeting */}
-      <div className="px-1">
-        <p className="text-[13px] text-muted-foreground">สวัสดี</p>
-        <h1 className="text-[22px] font-bold tracking-tight">{session?.user?.name ?? "..."}</h1>
-      </div>
+      {/* Greeting + Export */}
+      <div className="px-1 flex items-start justify-between">
+        <div>
+          <p className="text-[13px] text-muted-foreground">สวัสดี</p>
+          <h1 className="text-[22px] font-bold tracking-tight">{session?.user?.name ?? "..."}</h1>
+        </div>
 
-      {/* Mode toggle */}
-      <div className="ios-card p-1 grid grid-cols-2 gap-1">
-        {(["month", "year"] as ViewMode[]).map((m) => (
+        {/* Export dropdown */}
+        <div className="relative">
           <button
-            key={m}
-            onClick={() => setMode(m)}
-            className={cn(
-              "py-2 rounded-xl text-[14px] font-semibold transition-all",
-              mode === m ? "bg-primary text-white shadow-sm" : "text-muted-foreground"
-            )}
+            onClick={() => setExportMenuOpen((o) => !o)}
+            disabled={isExporting}
+            className="h-9 w-9 rounded-full bg-card flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors active:scale-90 disabled:opacity-50 shadow-sm"
+            aria-label="Export"
           >
-            {m === "month" ? "รายเดือน" : "รายปี"}
+            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           </button>
-        ))}
+
+          {exportMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setExportMenuOpen(false)} />
+              <div className="absolute right-0 top-11 z-20 ios-card shadow-lg overflow-hidden min-w-[160px]">
+                <button
+                  onClick={() => handleExport("image")}
+                  className="w-full flex items-center gap-2.5 px-4 py-3 text-[14px] hover:bg-muted/50 transition-colors text-left"
+                >
+                  <ImageIcon className="h-4 w-4 text-primary shrink-0" />
+                  บันทึกรูปภาพ
+                </button>
+                <div className="h-px bg-border/50 mx-4" />
+                <button
+                  onClick={() => handleExport("pdf")}
+                  className="w-full flex items-center gap-2.5 px-4 py-3 text-[14px] hover:bg-muted/50 transition-colors text-left"
+                >
+                  <FileText className="h-4 w-4 text-primary shrink-0" />
+                  บันทึก PDF
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Period navigator */}
-      <div className="flex items-center justify-between px-1">
-        <button onClick={prevPeriod} className="h-8 w-8 rounded-full hover:bg-card flex items-center justify-center transition-colors active:scale-90">
-          <ChevronLeft className="h-5 w-5 text-muted-foreground" />
-        </button>
-        <span className="text-[16px] font-semibold">{periodLabel}</span>
-        <button onClick={nextPeriod} className="h-8 w-8 rounded-full hover:bg-card flex items-center justify-center transition-colors active:scale-90">
-          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-        </button>
+      {/* Captured content */}
+      <div ref={contentRef} className="space-y-5">
+        {/* Mode toggle */}
+        <div className="ios-card p-1 grid grid-cols-2 gap-1">
+          {(["month", "year"] as ViewMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={cn(
+                "py-2 rounded-xl text-[14px] font-semibold transition-all",
+                mode === m ? "bg-primary text-white shadow-sm" : "text-muted-foreground"
+              )}
+            >
+              {m === "month" ? "รายเดือน" : "รายปี"}
+            </button>
+          ))}
+        </div>
+
+        {/* Family filter */}
+        <div className="ios-card p-1 grid grid-cols-3 gap-1">
+          {([
+            { key: "all", label: "ทุกรายการ" },
+            { key: "mine", label: "ของฉัน" },
+            { key: "family", label: "ครอบครัว" },
+          ] as { key: FamilyFilterType; label: string }[]).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setFamilyFilter(key)}
+              className={cn(
+                "py-1.5 rounded-xl text-[13px] font-semibold transition-all",
+                familyFilter === key ? "bg-[#AF52DE] text-white shadow-sm" : "text-muted-foreground"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Period navigator */}
+        <div className="flex items-center justify-between px-1">
+          <button onClick={prevPeriod} className="h-8 w-8 rounded-full hover:bg-card flex items-center justify-center transition-colors active:scale-90">
+            <ChevronLeft className="h-5 w-5 text-muted-foreground" />
+          </button>
+          <span className="text-[16px] font-semibold">{periodLabel}</span>
+          <button onClick={nextPeriod} className="h-8 w-8 rounded-full hover:bg-card flex items-center justify-center transition-colors active:scale-90">
+            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Month view */}
+        {mode === "month" && (
+          <>
+            <BalanceHero summary={summary} loading={loadingMonth} />
+            <DebtBanner summary={summary} loading={loadingMonth} />
+            {familyFilter === "family" && (
+              <FamilyMemberSection data={familySummary} loading={loadingFamily} />
+            )}
+            <UpcomingSection payments={upcoming} loading={loadingMonth} />
+            <CategorySection data={categoryData} loading={loadingMonth} />
+          </>
+        )}
+
+        {/* Year view */}
+        {mode === "year" && (
+          <>
+            <MonthlyChart data={monthlyData} loading={loadingYear} />
+            <TrendChart trend={trendData} loading={loadingYear} />
+          </>
+        )}
       </div>
-
-      {/* Month view */}
-      {mode === "month" && (
-        <>
-          <BalanceHero summary={summary} loading={loadingMonth} />
-          <DebtBanner summary={summary} loading={loadingMonth} />
-          <UpcomingSection payments={upcoming} loading={loadingMonth} />
-          <CategorySection data={categoryData} loading={loadingMonth} />
-        </>
-      )}
-
-      {/* Year view */}
-      {mode === "year" && (
-        <>
-          <MonthlyChart data={monthlyData} loading={loadingYear} />
-          <TrendChart trend={trendData} loading={loadingYear} />
-        </>
-      )}
     </div>
   );
 }
