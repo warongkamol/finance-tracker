@@ -102,7 +102,22 @@ function MemberRow({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
+
+  // Profile state
+  const [editingName, setEditingName] = useState(false);
+  const [profileName, setProfileName] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [nameError, setNameError] = useState("");
+
+  // Password change state
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   // Family group state
   const [group, setGroup] = useState<FamilyGroup | null>(null);
@@ -296,6 +311,85 @@ export default function SettingsPage() {
     }
   }
 
+  // ── Profile Actions ──────────────────────────────────────────────────────
+
+  function startEditingName() {
+    setProfileName(session?.user?.name ?? "");
+    setNameError("");
+    setEditingName(true);
+  }
+
+  function cancelEditingName() {
+    setEditingName(false);
+    setProfileName(session?.user?.name ?? "");
+    setNameError("");
+  }
+
+  async function handleSaveName() {
+    const trimmed = profileName.trim();
+    if (!trimmed || trimmed === session?.user?.name) { cancelEditingName(); return; }
+    setSavingName(true);
+    setNameError("");
+    try {
+      const res = await fetch("/api/v1/auth/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await updateSession({ name: data.data.name });
+        setEditingName(false);
+      } else {
+        setNameError(data.error?.message ?? "เกิดข้อผิดพลาด");
+      }
+    } finally {
+      setSavingName(false);
+    }
+  }
+
+  function closePasswordDialog() {
+    setShowPasswordDialog(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setPasswordError("");
+    setPasswordSuccess(false);
+  }
+
+  async function handleChangePassword() {
+    if (changingPassword) return;
+    setPasswordError("");
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError("รหัสผ่านใหม่ไม่ตรงกัน");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError("รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร");
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      const res = await fetch("/api/v1/auth/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPasswordSuccess(true);
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmNewPassword("");
+        setTimeout(closePasswordDialog, 1200);
+      } else {
+        setPasswordError(data.error?.message ?? "เกิดข้อผิดพลาด");
+      }
+    } finally {
+      setChangingPassword(false);
+    }
+  }
+
   return (
     <div className="py-5 space-y-6">
       <div className="px-1">
@@ -303,16 +397,50 @@ export default function SettingsPage() {
       </div>
 
       {/* Profile */}
-      <div className="ios-card px-4 py-4">
-        <div className="flex items-center gap-3">
+      <div className="ios-card overflow-hidden">
+        <div className="px-4 py-4 flex items-center gap-3">
           <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
             <span className="text-[20px]">👤</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[16px] font-semibold truncate">{session?.user?.name ?? "—"}</p>
-            <p className="text-[13px] text-muted-foreground truncate">{session?.user?.email ?? "—"}</p>
+            {editingName ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  className="h-9 text-[15px] bg-input border-0 rounded-lg flex-1"
+                  maxLength={100}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSaveName();
+                    if (e.key === "Escape") cancelEditingName();
+                  }}
+                />
+                <button onClick={handleSaveName} disabled={savingName} className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  {savingName ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                </button>
+                <button onClick={cancelEditingName} className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground flex items-center justify-center shrink-0">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button onClick={startEditingName} className="flex items-center gap-1.5 min-w-0">
+                <p className="text-[16px] font-semibold truncate">{session?.user?.name ?? "—"}</p>
+                <Pencil className="h-3 w-3 text-muted-foreground shrink-0" />
+              </button>
+            )}
+            <p className="text-[13px] text-muted-foreground truncate mt-0.5">{session?.user?.email ?? "—"}</p>
+            {nameError && <p className="text-[12px] text-destructive mt-1">{nameError}</p>}
           </div>
         </div>
+
+        <button
+          onClick={() => setShowPasswordDialog(true)}
+          className="w-full flex items-center justify-between px-4 py-3 border-t border-border/50 hover:bg-muted/50 transition-colors text-left"
+        >
+          <span className="text-[14px] font-medium">เปลี่ยนรหัสผ่าน</span>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </button>
       </div>
 
       {/* ─── Family Group ─────────────────────────────────────────────────── */}
@@ -568,6 +696,51 @@ export default function SettingsPage() {
           <span className="text-[15px] font-medium">ออกจากระบบ</span>
         </button>
       </div>
+
+      {/* Change password */}
+      <Dialog open={showPasswordDialog} onOpenChange={(open) => { if (!open) closePasswordDialog(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>เปลี่ยนรหัสผ่าน</DialogTitle>
+            <DialogDescription>กรอกรหัสผ่านปัจจุบันและรหัสผ่านใหม่ของคุณ</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <Input
+              type="password"
+              placeholder="รหัสผ่านปัจจุบัน"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="bg-input border-0 rounded-xl"
+              autoComplete="current-password"
+            />
+            <Input
+              type="password"
+              placeholder="รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="bg-input border-0 rounded-xl"
+              autoComplete="new-password"
+            />
+            <Input
+              type="password"
+              placeholder="ยืนยันรหัสผ่านใหม่"
+              value={confirmNewPassword}
+              onChange={(e) => setConfirmNewPassword(e.target.value)}
+              className="bg-input border-0 rounded-xl"
+              autoComplete="new-password"
+              onKeyDown={(e) => { if (e.key === "Enter") handleChangePassword(); }}
+            />
+            {passwordError && <p className="text-[13px] text-destructive">{passwordError}</p>}
+            {passwordSuccess && <p className="text-[13px] text-[#34C759]">เปลี่ยนรหัสผ่านสำเร็จ</p>}
+          </div>
+          <DialogFooter className="mt-4 gap-2">
+            <Button variant="secondary" onClick={closePasswordDialog} disabled={changingPassword}>ยกเลิก</Button>
+            <Button onClick={handleChangePassword} disabled={changingPassword || !currentPassword || !newPassword || !confirmNewPassword}>
+              {changingPassword ? "กำลังเปลี่ยน..." : "เปลี่ยนรหัสผ่าน"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Leave group confirm */}
       <Dialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>

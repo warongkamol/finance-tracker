@@ -20,7 +20,18 @@ export const resetPasswordSchema = z.object({
   password: z.string().min(8, "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร").max(100),
 });
 
+export const updateProfileSchema = z.object({
+  name: z.string().min(1, "กรุณากรอกชื่อ").max(100),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "กรุณากรอกรหัสผ่านปัจจุบัน"),
+  newPassword: z.string().min(8, "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร").max(100),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
