@@ -131,9 +131,9 @@ export default function SettingsPage() {
   const [copied, setCopied] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
-  // Nickname state
-  const [nickname, setNickname] = useState("");
-  const [editingNickname, setEditingNickname] = useState(false);
+  // Nickname state — any group member can rename any other member
+  const [editingNicknameFor, setEditingNicknameFor] = useState<string | null>(null);
+  const [nicknameDraft, setNicknameDraft] = useState("");
   const [savingNickname, setSavingNickname] = useState(false);
 
   // Family member tag state
@@ -150,14 +150,7 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/v1/family");
       const data = await res.json();
-      if (data.success) {
-        const g = data.data?.group ?? null;
-        setGroup(g);
-        if (g) {
-          const me = g.members.find((m: FamilyGroupMember) => m.isMe);
-          if (me) setNickname(me.familyNickname ?? "");
-        }
-      }
+      if (data.success) setGroup(data.data?.group ?? null);
     } finally {
       setGroupLoading(false);
     }
@@ -231,14 +224,26 @@ export default function SettingsPage() {
   }
 
   // ── Nickname Actions ─────────────────────────────────────────────────────
+  // Any member of the group can set a nickname for any other member, not just themselves.
 
-  async function handleSaveNickname() {
+  function startEditingNickname(member: FamilyGroupMember) {
+    setEditingNicknameFor(member.id);
+    setNicknameDraft(member.familyNickname ?? "");
+  }
+
+  function cancelEditingNickname() {
+    setEditingNicknameFor(null);
+    setNicknameDraft("");
+  }
+
+  async function handleSaveNickname(memberId: string) {
     setSavingNickname(true);
     try {
+      const trimmed = nicknameDraft.trim();
       const res = await fetch("/api/v1/family/nickname", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname: nickname.trim() || null }),
+        body: JSON.stringify({ userId: memberId, nickname: trimmed || null }),
       });
       const data = await res.json();
       if (data.success) {
@@ -247,15 +252,17 @@ export default function SettingsPage() {
             ? {
                 ...prev,
                 members: prev.members.map((m) =>
-                  m.isMe ? { ...m, familyNickname: nickname.trim() || null, displayName: nickname.trim() || m.name } : m
+                  m.id === memberId
+                    ? { ...m, familyNickname: data.data.familyNickname, displayName: data.data.familyNickname ?? m.name }
+                    : m
                 ),
               }
             : prev
         );
+        setEditingNicknameFor(null);
       }
     } finally {
       setSavingNickname(false);
-      setEditingNickname(false);
     }
   }
 
@@ -488,48 +495,46 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  {/* Nickname editor — self only */}
-                  {m.isMe && (
-                    <div className="mt-2 ml-12">
-                      {editingNickname ? (
-                        <div className="flex items-center gap-2">
-                          <Input
-                            placeholder={`ชื่อเล่นในกลุ่ม เช่น เอ็ม`}
-                            value={nickname}
-                            onChange={(e) => setNickname(e.target.value)}
-                            maxLength={50}
-                            className="h-8 text-[13px] bg-input border-0 rounded-lg flex-1"
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleSaveNickname();
-                              if (e.key === "Escape") setEditingNickname(false);
-                            }}
-                          />
-                          <button
-                            onClick={handleSaveNickname}
-                            disabled={savingNickname}
-                            className="h-7 w-7 rounded-full bg-[#AF52DE]/10 text-[#AF52DE] flex items-center justify-center"
-                          >
-                            {savingNickname ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                          </button>
-                          <button
-                            onClick={() => setEditingNickname(false)}
-                            className="h-7 w-7 rounded-full hover:bg-muted text-muted-foreground flex items-center justify-center"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ) : (
+                  {/* Nickname editor — any member can rename any member */}
+                  <div className="mt-2 ml-12">
+                    {editingNicknameFor === m.id ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder={m.isMe ? "ชื่อเล่นในกลุ่ม เช่น เอ็ม" : `ตั้งชื่อเล่นให้ ${m.name}`}
+                          value={nicknameDraft}
+                          onChange={(e) => setNicknameDraft(e.target.value)}
+                          maxLength={50}
+                          className="h-8 text-[13px] bg-input border-0 rounded-lg flex-1"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveNickname(m.id);
+                            if (e.key === "Escape") cancelEditingNickname();
+                          }}
+                        />
                         <button
-                          onClick={() => setEditingNickname(true)}
-                          className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-[#AF52DE] transition-colors"
+                          onClick={() => handleSaveNickname(m.id)}
+                          disabled={savingNickname}
+                          className="h-7 w-7 rounded-full bg-[#AF52DE]/10 text-[#AF52DE] flex items-center justify-center"
                         >
-                          <Pencil className="h-3 w-3" />
-                          {m.familyNickname ? `ชื่อเล่น: ${m.familyNickname}` : "ตั้งชื่อเล่นในกลุ่ม"}
+                          {savingNickname ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
                         </button>
-                      )}
-                    </div>
-                  )}
+                        <button
+                          onClick={cancelEditingNickname}
+                          className="h-7 w-7 rounded-full hover:bg-muted text-muted-foreground flex items-center justify-center"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => startEditingNickname(m)}
+                        className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-[#AF52DE] transition-colors"
+                      >
+                        <Pencil className="h-3 w-3" />
+                        {m.familyNickname ? `ชื่อเล่น: ${m.familyNickname}` : m.isMe ? "ตั้งชื่อเล่นในกลุ่ม" : `ตั้งชื่อเล่นให้ ${m.name}`}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
