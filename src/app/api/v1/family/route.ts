@@ -31,13 +31,26 @@ export async function GET() {
       return NextResponse.json({ success: true, data: { group: null } });
     }
 
+    // Private aliases the caller has set for other members — only the caller
+    // can see/edit these; they override the target's shared nickname, but
+    // only in the caller's own view.
+    const myAliases = await prisma.familyMemberAlias.findMany({
+      where: { viewerId: session.user.id },
+      select: { targetId: true, nickname: true },
+    });
+    const aliasByTarget = new Map(myAliases.map((a) => [a.targetId, a.nickname]));
+
     const group = {
       ...user.familyGroup,
-      members: user.familyGroup.members.map((m) => ({
-        ...m,
-        displayName: m.familyNickname ?? m.name,
-        isMe: m.id === session.user.id,
-      })),
+      members: user.familyGroup.members.map((m) => {
+        const myAlias = aliasByTarget.get(m.id) ?? null;
+        return {
+          ...m,
+          myAlias,
+          displayName: myAlias ?? m.familyNickname ?? m.name,
+          isMe: m.id === session.user.id,
+        };
+      }),
     };
 
     return NextResponse.json({ success: true, data: { group } });

@@ -34,11 +34,18 @@ export async function GET(req: NextRequest) {
       _sum: { amount: true },
     });
 
-    // Fetch member info (name + nickname)
+    // Fetch member info (name + shared nickname)
     const memberUsers = await prisma.user.findMany({
       where: { id: { in: familyMemberIds } },
       select: { id: true, name: true, familyNickname: true },
     });
+
+    // Caller's private aliases — override the shared nickname, visible only to caller
+    const myAliases = await prisma.familyMemberAlias.findMany({
+      where: { viewerId: session.user.id },
+      select: { targetId: true, nickname: true },
+    });
+    const aliasByTarget = new Map(myAliases.map((a) => [a.targetId, a.nickname]));
 
     const members = memberUsers.map((u) => {
       const income = Number(
@@ -49,7 +56,7 @@ export async function GET(req: NextRequest) {
       );
       return {
         userId: u.id,
-        name: u.familyNickname ?? u.name,
+        name: aliasByTarget.get(u.id) ?? u.familyNickname ?? u.name,
         isMe: u.id === session.user.id,
         income,
         expense,

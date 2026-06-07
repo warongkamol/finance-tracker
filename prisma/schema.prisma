@@ -45,9 +45,29 @@ model User {
   paymentMethods      PaymentMethod[]
   familyMembers       FamilyMember[]
   passwordResetTokens PasswordResetToken[]
+  aliasesGiven        FamilyMemberAlias[] @relation("FamilyAliasViewer")
+  aliasesReceived     FamilyMemberAlias[] @relation("FamilyAliasTarget")
 
   @@index([familyGroupId])
   @@map("users")
+}
+
+// Private, per-viewer nickname for another family-group member — like a
+// contact alias in a messaging app. Only the viewer who set it can see it;
+// it never affects how the target is displayed to anyone else.
+model FamilyMemberAlias {
+  id        String   @id @default(cuid())
+  viewerId  String   @map("viewer_id")
+  viewer    User     @relation("FamilyAliasViewer", fields: [viewerId], references: [id], onDelete: Cascade)
+  targetId  String   @map("target_id")
+  target    User     @relation("FamilyAliasTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  nickname  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([viewerId, targetId])
+  @@index([targetId])
+  @@map("family_member_aliases")
 }
 
 model PasswordResetToken {
