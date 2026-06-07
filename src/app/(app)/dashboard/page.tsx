@@ -443,16 +443,22 @@ function FamilyMemberSection({ data, loading }: { data: FamilySummary | null; lo
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <div className="rounded-lg bg-[#34C759]/8 px-3 py-1.5">
-                  <p className="text-[10px] text-[#34C759] font-medium">รายรับ</p>
-                  <p className="text-[13px] font-semibold text-[#34C759] tabular-nums">{formatCurrency(m.income)}</p>
+              {(m.income > 0 || m.expense > 0) && (
+                <div className={cn("grid gap-2 mb-2", m.income > 0 && m.expense > 0 ? "grid-cols-2" : "grid-cols-1")}>
+                  {m.income > 0 && (
+                    <div className="rounded-lg bg-[#34C759]/8 px-3 py-1.5">
+                      <p className="text-[10px] text-[#34C759] font-medium">รายรับ</p>
+                      <p className="text-[13px] font-semibold text-[#34C759] tabular-nums">{formatCurrency(m.income)}</p>
+                    </div>
+                  )}
+                  {m.expense > 0 && (
+                    <div className="rounded-lg bg-[#FF3B30]/8 px-3 py-1.5">
+                      <p className="text-[10px] text-[#FF3B30] font-medium">รายจ่าย {pct > 0 && `· ${pct}%`}</p>
+                      <p className="text-[13px] font-semibold text-[#FF3B30] tabular-nums">{formatCurrency(m.expense)}</p>
+                    </div>
+                  )}
                 </div>
-                <div className="rounded-lg bg-[#FF3B30]/8 px-3 py-1.5">
-                  <p className="text-[10px] text-[#FF3B30] font-medium">รายจ่าย {pct > 0 && `· ${pct}%`}</p>
-                  <p className="text-[13px] font-semibold text-[#FF3B30] tabular-nums">{formatCurrency(m.expense)}</p>
-                </div>
-              </div>
+              )}
 
               {totalExpense > 0 && (
                 <div className="h-1 bg-border/50 rounded-full overflow-hidden">
