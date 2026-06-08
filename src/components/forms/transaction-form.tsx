@@ -276,7 +276,7 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
           </div>
           <button
             type="button"
-            onClick={() => { setIsFamily((v) => !v); if (isFamily) setFamilyMemberId(null); }}
+            onClick={() => { setIsFamily((v) => !v); if (isFamily) { setFamilyMemberId(null); setFamilyGroupId(null); } }}
             className={cn(
               "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
               isFamily ? "bg-primary" : "bg-input"
