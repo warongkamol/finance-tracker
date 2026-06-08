@@ -11,6 +11,7 @@ import { TransactionForm } from "@/components/forms/transaction-form";
 import { formatCurrency, formatShortDate, getMonthName, getCurrentMonth, cn } from "@/lib/utils";
 import { buildFilename, captureAsPDF } from "@/lib/export";
 import Link from "next/link";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface UpcomingPayment {
   id: string;
@@ -85,6 +86,8 @@ export default function TransactionsPage() {
   const [month, setMonth] = useState(now.month);
   const [filter, setFilter] = useState<FilterType>("ALL");
   const [familyFilter, setFamilyFilter] = useState<FamilyFilterType>("all");
+  const [familyGroups, setFamilyGroups] = useState<{ id: string; name: string; displayName: string }[]>([]);
+  const [selectedFamilyGroupId, setSelectedFamilyGroupId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -107,6 +110,18 @@ export default function TransactionsPage() {
     return () => clearTimeout(t);
   }, [search]);
 
+  useEffect(() => {
+    fetch("/api/v1/family")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) {
+          const groups = d.data.groups as { id: string; name: string; displayName: string }[];
+          setFamilyGroups(groups);
+          setSelectedFamilyGroupId((prev) => prev ?? groups[0]?.id ?? null);
+        }
+      });
+  }, []);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -116,6 +131,7 @@ export default function TransactionsPage() {
         ...(filter !== "ALL" && { type: filter }),
         ...(debouncedSearch && { search: debouncedSearch }),
         ...(familyFilter !== "all" && { familyFilter }),
+        ...(familyFilter === "family" && selectedFamilyGroupId && { familyGroupId: selectedFamilyGroupId }),
       });
 
       const [txRes, sumRes, upRes] = await Promise.all([
@@ -131,7 +147,7 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [year, month, filter, familyFilter, debouncedSearch]);
+  }, [year, month, filter, familyFilter, selectedFamilyGroupId, debouncedSearch]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -274,6 +290,21 @@ export default function TransactionsPage() {
           </button>
         ))}
       </div>
+
+      {/* Group picker — which group's shared DATA to view. Independent of
+          the settings-page picker and the entry-form picker (no sync). */}
+      {familyFilter === "family" && familyGroups.length > 0 && (
+        <Select value={selectedFamilyGroupId ?? undefined} onValueChange={setSelectedFamilyGroupId}>
+          <SelectTrigger className="h-10 bg-input border-0 rounded-xl text-[13px]">
+            <SelectValue placeholder="เลือกกลุ่ม" />
+          </SelectTrigger>
+          <SelectContent>
+            {familyGroups.map((g) => (
+              <SelectItem key={g.id} value={g.id}>{g.displayName}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       {/* Pending installments */}
       {pendingPayments.length > 0 && (
