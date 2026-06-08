@@ -40,11 +40,11 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const [me, target] = await Promise.all([
-      prisma.user.findUnique({ where: { id: viewerId }, select: { familyGroupId: true } }),
-      prisma.user.findUnique({ where: { id: targetUserId }, select: { familyGroupId: true } }),
-    ]);
-    if (!me?.familyGroupId || me.familyGroupId !== target?.familyGroupId) {
+    const sharedGroup = await prisma.userFamilyGroup.findFirst({
+      where: { userId: viewerId, group: { memberships: { some: { userId: targetUserId } } } },
+      select: { id: true },
+    });
+    if (!sharedGroup) {
       return NextResponse.json(
         { success: false, error: { code: "FORBIDDEN", message: "ไม่สามารถตั้งชื่อเรียกสมาชิกนี้ได้" } },
         { status: 403 }
