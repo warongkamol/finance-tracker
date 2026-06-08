@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getFamilyMemberIds } from "@/lib/family";
+import { getUserFamilyGroups } from "@/lib/family";
 
 export async function GET(req: NextRequest) {
   try {
@@ -22,21 +22,35 @@ export async function GET(req: NextRequest) {
     const startDate = new Date(Date.UTC(year, month - 1, 1));
     const endDate = new Date(Date.UTC(year, month, 1));
 
-    // Resolve user IDs for transaction query
-    let txUserIds: string[] = [session.user.id];
+    // Resolve all the groups this user belongs to once — feeds both (a) the
+    // family-filter scoping below and (b) the always-on family-debts banner,
+    // which must show debts across every group the user is in, not just the
+    // one currently selected in the dashboard's group-picker dropdown.
+    const myGroups = await getUserFamilyGroups(session.user.id);
+    const myGroupIds = myGroups.map((g) => g.id);
+
+    // "family" now scopes by an explicit, authorized familyGroupId — never a
+    // merge across the user's groups. With no group selected, fall back to
+    // the pre-multi-group behavior: just the caller's own family-tagged rows.
+    let baseWhere: { userId?: string | { in: string[] }; isFamily?: boolean; familyGroupId?: string; date: { gte: Date; lt: Date } };
     if (familyFilter === "family") {
-      txUserIds = await getFamilyMemberIds(session.user.id);
+      const familyGroupIdParam = searchParams.get("familyGroupId");
+      if (familyGroupIdParam) {
+        if (!myGroupIds.includes(familyGroupIdParam)) {
+          return NextResponse.json(
+            { success: false, error: { code: "FORBIDDEN", message: "คุณไม่ได้อยู่ในกลุ่มนี้" } },
+            { status: 403 }
+          );
+        }
+        baseWhere = { familyGroupId: familyGroupIdParam, date: { gte: startDate, lt: endDate } };
+      } else {
+        baseWhere = { userId: session.user.id, isFamily: true, date: { gte: startDate, lt: endDate } };
+      }
+    } else {
+      // "mine" now reflects everything the user paid for (personal + family-tagged) — the
+      // same underlying scope as "all" — the UI additionally shows a personal/family split.
+      baseWhere = { userId: session.user.id, date: { gte: startDate, lt: endDate } };
     }
-
-    // "mine" now reflects everything the user paid for (personal + family-tagged) — the
-    // same underlying scope as "all" — the UI additionally shows a personal/family split.
-    const baseWhere =
-      familyFilter === "family"
-        ? { userId: { in: txUserIds }, isFamily: true, date: { gte: startDate, lt: endDate } }
-        : { userId: session.user.id, date: { gte: startDate, lt: endDate } };
-
-    // Get family member IDs for shared family debt view
-    const familyMemberIds = await getFamilyMemberIds(session.user.id);
 
     const [txGroups, splitGroups, personalDebts, familyDebts, overdueCount] = await Promise.all([
       prisma.transaction.groupBy({
@@ -59,9 +73,12 @@ export async function GET(req: NextRequest) {
           payments: { where: { status: { not: "PAID" } }, select: { amount: true } },
         },
       }),
-      // Family debts: all group members (or just self if solo), isFamily=true
+      // Family debts banner: every ACTIVE debt tagged to ANY of the user's
+      // groups (not just the one selected in the filter dropdown — this
+      // banner is always-on regardless of which family-data tab is active).
+      // Groupless users see nothing here (myGroupIds = []).
       prisma.debt.findMany({
-        where: { userId: { in: familyMemberIds }, status: "ACTIVE", isFamily: true },
+        where: { familyGroupId: { in: myGroupIds }, status: "ACTIVE" },
         include: {
           payments: { where: { status: { not: "PAID" } }, select: { amount: true } },
         },
