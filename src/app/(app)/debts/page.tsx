@@ -33,6 +33,12 @@ interface Debt {
   overdueCount: number;
 }
 
+interface FamilyGroup {
+  id: string;
+  name: string;
+  displayName: string;
+}
+
 type TabType = "ACTIVE" | "COMPLETED" | "CANCELLED";
 
 function Skeleton({ className }: { className?: string }) {
@@ -66,6 +72,7 @@ export default function DebtsPage() {
   const [deletingDebt, setDeletingDebt] = useState<Debt | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [inFamilyGroup, setInFamilyGroup] = useState(false);
+  const [familyGroups, setFamilyGroups] = useState<FamilyGroup[]>([]);
 
   const fetchDebts = useCallback(async () => {
     setLoading(true);
@@ -76,7 +83,10 @@ export default function DebtsPage() {
       ]);
       const [debtData, familyData] = await Promise.all([debtRes.json(), familyRes.json()]);
       if (debtData.success) setDebts(debtData.data);
-      if (familyData.success) setInFamilyGroup(!!familyData.data?.group);
+      if (familyData.success) {
+        setFamilyGroups(familyData.data.groups);
+        setInFamilyGroup(familyData.data.groups.length > 0);
+      }
     } finally {
       setLoading(false);
     }
@@ -200,6 +210,7 @@ export default function DebtsPage() {
             onSuccess={() => { setSheetOpen(false); fetchDebts(); }}
             onCancel={() => setSheetOpen(false)}
             inFamilyGroup={inFamilyGroup}
+            familyGroups={familyGroups}
           />
         </SheetContent>
       </Sheet>
