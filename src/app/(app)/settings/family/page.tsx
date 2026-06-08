@@ -78,6 +78,15 @@ export default function FamilySettingsPage() {
 
   useEffect(() => { fetchGroups(); }, [fetchGroups]);
 
+  // Reset inline-editor state whenever the selected group changes — otherwise
+  // an open editor (with a stale draft) would keep operating on the new group.
+  useEffect(() => {
+    setEditingGroupNickname(false);
+    setGroupNicknameDraft("");
+    setEditingAliasFor(null);
+    setAliasDraft("");
+  }, [selectedGroupId]);
+
   const selectedGroup = groups.find((g) => g.id === selectedGroupId) ?? null;
 
   // ── Create / Join — always visible, user can always add more groups ──────
@@ -155,7 +164,6 @@ export default function FamilySettingsPage() {
         const leftId = selectedGroup.id;
         setGroups((prev) => prev.filter((g) => g.id !== leftId));
         setSelectedGroupId((prev) => (prev === leftId ? null : prev));
-        fetchGroups();
       }
     } finally {
       setLeaving(false);
