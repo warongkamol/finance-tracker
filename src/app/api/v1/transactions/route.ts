@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { createTransactionSchema } from "@/lib/validations/transaction";
 import { TransactionType, Prisma } from "@/generated/prisma/client";
 import { checkBudgetAlert } from "@/lib/budget-alert";
-import { getFamilyMemberIds } from "@/lib/family";
 
 export async function GET(req: NextRequest) {
   try {
@@ -30,18 +29,32 @@ export async function GET(req: NextRequest) {
     const startDate = new Date(Date.UTC(year, month - 1, 1));
     const endDate = new Date(Date.UTC(year, month, 1));
 
-    // Resolve userIds for family shared view
-    let txUserIds: string[] = [session.user.id];
+    // "family" now scopes by an explicit, authorized familyGroupId — never a
+    // merge across the user's groups (per spec: switcher, not merge). With no
+    // group selected (groupless user, or before the dropdown picks one), fall
+    // back to the pre-multi-group behavior: just the caller's own family-tagged rows.
+    let where: Prisma.TransactionWhereInput;
     if (familyFilter === "family") {
-      txUserIds = await getFamilyMemberIds(session.user.id);
+      const familyGroupIdParam = searchParams.get("familyGroupId");
+      if (familyGroupIdParam) {
+        const membership = await prisma.userFamilyGroup.findUnique({
+          where: { userId_groupId: { userId: session.user.id, groupId: familyGroupIdParam } },
+        });
+        if (!membership) {
+          return NextResponse.json(
+            { success: false, error: { code: "FORBIDDEN", message: "คุณไม่ได้อยู่ในกลุ่มนี้" } },
+            { status: 403 }
+          );
+        }
+        where = { familyGroupId: familyGroupIdParam, date: { gte: startDate, lt: endDate } };
+      } else {
+        where = { userId: session.user.id, isFamily: true, date: { gte: startDate, lt: endDate } };
+      }
+    } else if (familyFilter === "mine") {
+      where = { userId: session.user.id, isFamily: false, date: { gte: startDate, lt: endDate } };
+    } else {
+      where = { userId: session.user.id, date: { gte: startDate, lt: endDate } };
     }
-
-    const where: Prisma.TransactionWhereInput =
-      familyFilter === "family"
-        ? { userId: { in: txUserIds }, isFamily: true, date: { gte: startDate, lt: endDate } }
-        : familyFilter === "mine"
-        ? { userId: session.user.id, isFamily: false, date: { gte: startDate, lt: endDate } }
-        : { userId: session.user.id, date: { gte: startDate, lt: endDate } };
 
     if (typeParam === "INCOME" || typeParam === "EXPENSE") {
       where.type = typeParam as TransactionType;
@@ -96,7 +109,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { type, amount, description, date, categoryId, paymentMethodId, isFamily, familyMemberId } = parsed.data;
+    const { type, amount, description, date, categoryId, paymentMethodId, isFamily, familyMemberId, familyGroupId } = parsed.data;
+
+    // familyGroupId controls cross-user visibility — verify membership before
+    // trusting a client-supplied value.
+    if (isFamily && familyGroupId) {
+      const membership = await prisma.userFamilyGroup.findUnique({
+        where: { userId_groupId: { userId: session.user.id, groupId: familyGroupId } },
+      });
+      if (!membership) {
+        return NextResponse.json(
+          { success: false, error: { code: "FORBIDDEN", message: "คุณไม่ได้อยู่ในกลุ่มนี้" } },
+          { status: 403 }
+        );
+      }
+    }
 
     const category = await prisma.category.findFirst({
       where: { id: categoryId, userId: session.user.id },
@@ -137,6 +164,7 @@ export async function POST(req: NextRequest) {
         userId: session.user.id,
         isFamily: isFamily ?? false,
         familyMemberId: isFamily ? (familyMemberId ?? null) : null,
+        familyGroupId: isFamily ? (familyGroupId ?? null) : null,
       },
       include: {
         category: { select: { id: true, name: true, icon: true, color: true } },
