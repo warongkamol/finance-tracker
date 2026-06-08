@@ -12,48 +12,64 @@ export async function GET() {
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+    const memberships = await prisma.userFamilyGroup.findMany({
+      where: { userId: session.user.id },
       select: {
-        familyGroupId: true,
-        familyGroup: {
+        group: {
           select: {
             id: true,
             inviteCode: true,
             name: true,
-            members: { select: { id: true, name: true, email: true } },
+            memberships: {
+              select: { user: { select: { id: true, name: true, email: true } } },
+            },
           },
         },
       },
+      orderBy: { joinedAt: "asc" },
     });
 
-    if (!user?.familyGroup) {
-      return NextResponse.json({ success: true, data: { group: null } });
+    if (memberships.length === 0) {
+      return NextResponse.json({ success: true, data: { groups: [] } });
     }
 
-    // Private aliases the caller has set for other members — only the caller
-    // can see/edit these; they override the target's profile name, but only
-    // in the caller's own view.
-    const myAliases = await prisma.familyMemberAlias.findMany({
-      where: { viewerId: session.user.id },
-      select: { targetId: true, nickname: true },
-    });
-    const aliasByTarget = new Map(myAliases.map((a) => [a.targetId, a.nickname]));
+    // Two independent private-alias resolutions for this viewer:
+    // - group nicknames (FamilyGroupAlias) -> each group's displayName
+    // - member nicknames (FamilyMemberAlias) -> each member's displayName
+    // Neither affects what anyone else sees; both are scoped to this viewer only.
+    const groupIds = memberships.map((m) => m.group.id);
+    const [myGroupAliases, myMemberAliases] = await Promise.all([
+      prisma.familyGroupAlias.findMany({
+        where: { viewerId: session.user.id, groupId: { in: groupIds } },
+        select: { groupId: true, nickname: true },
+      }),
+      prisma.familyMemberAlias.findMany({
+        where: { viewerId: session.user.id },
+        select: { targetId: true, nickname: true },
+      }),
+    ]);
+    const groupAliasByGroup = new Map(myGroupAliases.map((a) => [a.groupId, a.nickname]));
+    const memberAliasByTarget = new Map(myMemberAliases.map((a) => [a.targetId, a.nickname]));
 
-    const group = {
-      ...user.familyGroup,
-      members: user.familyGroup.members.map((m) => {
-        const myAlias = aliasByTarget.get(m.id) ?? null;
+    const groups = memberships.map(({ group }) => ({
+      id: group.id,
+      inviteCode: group.inviteCode,
+      name: group.name,
+      displayName: groupAliasByGroup.get(group.id) ?? group.name,
+      members: group.memberships.map(({ user: m }) => {
+        const myAlias = memberAliasByTarget.get(m.id) ?? null;
         return {
-          ...m,
+          id: m.id,
+          name: m.name,
+          email: m.email,
           myAlias,
           displayName: myAlias ?? m.name,
           isMe: m.id === session.user.id,
         };
       }),
-    };
+    }));
 
-    return NextResponse.json({ success: true, data: { group } });
+    return NextResponse.json({ success: true, data: { groups } });
   } catch {
     return NextResponse.json(
       { success: false, error: { code: "INTERNAL_ERROR", message: "เกิดข้อผิดพลาด" } },
