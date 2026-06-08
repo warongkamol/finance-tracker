@@ -75,8 +75,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, totalAmount, totalMonths, monthlyAmount, startDate, notes } = parsed.data;
+    const { name, totalAmount, totalMonths, monthlyAmount, startDate, notes, familyGroupId } = parsed.data;
     const isFamily = typeof body.isFamily === "boolean" ? body.isFamily : false;
+
+    // familyGroupId controls cross-user visibility — verify membership before
+    // trusting a client-supplied value (mirrors the transactions routes' check).
+    if (isFamily && familyGroupId) {
+      const membership = await prisma.userFamilyGroup.findUnique({
+        where: { userId_groupId: { userId: session.user.id, groupId: familyGroupId } },
+      });
+      if (!membership) {
+        return NextResponse.json(
+          { success: false, error: { code: "FORBIDDEN", message: "คุณไม่ได้อยู่ในกลุ่มนี้" } },
+          { status: 403 }
+        );
+      }
+    }
 
     const effectiveMonthly = monthlyAmount ?? totalAmount / totalMonths;
     const start = new Date(startDate);
@@ -94,6 +108,7 @@ export async function POST(req: NextRequest) {
           endDate: end,
           notes: notes ?? null,
           isFamily: isFamily ?? false,
+          familyGroupId: isFamily ? (familyGroupId ?? null) : null,
           userId: session.user.id,
           status: "ACTIVE",
         },

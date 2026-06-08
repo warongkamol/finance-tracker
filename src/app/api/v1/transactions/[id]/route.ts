@@ -70,7 +70,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
       );
     }
 
-    const { type, amount, description, date, categoryId, paymentMethodId, isFamily, familyMemberId } = parsed.data;
+    const { type, amount, description, date, categoryId, paymentMethodId, isFamily, familyMemberId, familyGroupId } = parsed.data;
+
+    // familyGroupId controls cross-user visibility — verify membership before
+    // trusting a client-supplied value (mirrors the POST route's check).
+    if (isFamily && familyGroupId) {
+      const membership = await prisma.userFamilyGroup.findUnique({
+        where: { userId_groupId: { userId: session.user.id, groupId: familyGroupId } },
+      });
+      if (!membership) {
+        return NextResponse.json(
+          { success: false, error: { code: "FORBIDDEN", message: "คุณไม่ได้อยู่ในกลุ่มนี้" } },
+          { status: 403 }
+        );
+      }
+    }
     const effectiveType = type ?? existing.type;
 
     if (categoryId) {
@@ -113,6 +127,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (isFamily !== undefined) {
       updateData.isFamily = isFamily;
       updateData.familyMemberId = isFamily ? (familyMemberId ?? null) : null;
+      updateData.familyGroupId = isFamily ? (familyGroupId ?? null) : null;
     }
 
     const transaction = await prisma.transaction.update({
