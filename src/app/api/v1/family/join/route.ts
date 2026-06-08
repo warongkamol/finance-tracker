@@ -24,20 +24,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { familyGroupId: true },
-    });
-    if (user?.familyGroupId) {
-      return NextResponse.json(
-        { success: false, error: { code: "ALREADY_IN_GROUP", message: "คุณอยู่ในกลุ่มครอบครัวแล้ว ออกจากกลุ่มก่อน" } },
-        { status: 400 }
-      );
-    }
-
     const group = await prisma.familyGroup.findUnique({
       where: { inviteCode: parsed.data.code.toUpperCase() },
-      include: { members: { select: { id: true, name: true, email: true } } },
+      include: { memberships: { select: { user: { select: { id: true, name: true, email: true } } } } },
     });
     if (!group) {
       return NextResponse.json(
@@ -46,20 +35,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await prisma.user.update({
-      where: { id: session.user.id },
-      data: { familyGroupId: group.id },
+    const existingMembership = await prisma.userFamilyGroup.findUnique({
+      where: { userId_groupId: { userId: session.user.id, groupId: group.id } },
+    });
+    if (existingMembership) {
+      return NextResponse.json(
+        { success: false, error: { code: "ALREADY_MEMBER", message: "คุณอยู่ในกลุ่มนี้แล้ว" } },
+        { status: 400 }
+      );
+    }
+
+    await prisma.userFamilyGroup.create({
+      data: { userId: session.user.id, groupId: group.id },
     });
 
     const updatedMembers = [
-      ...group.members.map((m) => ({ ...m, isMe: m.id === session.user.id })),
+      ...group.memberships.map(({ user: m }) => ({ ...m, isMe: m.id === session.user.id })),
       { id: session.user.id, name: session.user.name, email: session.user.email, isMe: true },
     ];
 
     return NextResponse.json({
       success: true,
       data: {
-        group: { id: group.id, inviteCode: group.inviteCode, members: updatedMembers },
+        group: {
+          id: group.id,
+          inviteCode: group.inviteCode,
+          name: group.name,
+          displayName: group.name,
+          members: updatedMembers,
+        },
       },
     });
   } catch {
