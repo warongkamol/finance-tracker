@@ -19,6 +19,7 @@ export const createDebtSchema = z.object({
     .optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ไม่ถูกต้อง"),
   notes: z.string().max(500, "หมายเหตุยาวเกินไป").nullable().optional(),
+  familyGroupId: z.string().min(1).nullable().optional(),
 });
 
 export const updateDebtSchema = createDebtSchema.partial().extend({

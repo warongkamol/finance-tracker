@@ -12,6 +12,7 @@ export const createTransactionSchema = z.object({
   paymentMethodId: z.string().min(1).nullable().optional(),
   isFamily: z.boolean().optional(),
   familyMemberId: z.string().min(1).nullable().optional(),
+  familyGroupId: z.string().min(1).nullable().optional(),
 });
 
 export const updateTransactionSchema = createTransactionSchema.partial();
