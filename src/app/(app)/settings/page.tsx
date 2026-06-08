@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { Pencil, Trash2, Plus, Check, X, Loader2, Users, LogOut, User, Copy, Link2, Link2Off, ChevronRight, BarChart2, FolderTree, Wallet } from "lucide-react";
+import { Pencil, Trash2, Plus, Check, X, Loader2, Users, LogOut, User, ChevronRight, FolderTree, Wallet } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,22 +16,6 @@ interface FamilyMember {
   name: string;
   createdAt: string;
   _count: { transactions: number };
-}
-
-interface FamilyGroupMember {
-  id: string;
-  name: string;
-  email: string;
-  /** Private alias the CURRENT VIEWER set for this member (null if none). Visible only to the viewer. */
-  myAlias?: string | null;
-  displayName: string;
-  isMe: boolean;
-}
-
-interface FamilyGroup {
-  id: string;
-  inviteCode: string;
-  members: FamilyGroupMember[];
 }
 
 // ─── Family Member Tag Row ────────────────────────────────────────────────────
@@ -120,24 +104,6 @@ export default function SettingsPage() {
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
-  // Family group state
-  const [group, setGroup] = useState<FamilyGroup | null>(null);
-  const [groupLoading, setGroupLoading] = useState(true);
-  const [joinCode, setJoinCode] = useState("");
-  const [joining, setJoining] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [leaving, setLeaving] = useState(false);
-  const [showJoinInput, setShowJoinInput] = useState(false);
-  const [groupError, setGroupError] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
-
-  // Private alias (others only) — what YOU privately call another member;
-  // visible only to you, never to the target or anyone else
-  const [editingAliasFor, setEditingAliasFor] = useState<string | null>(null);
-  const [aliasDraft, setAliasDraft] = useState("");
-  const [savingAlias, setSavingAlias] = useState(false);
-
   // Family member tag state
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
@@ -146,17 +112,6 @@ export default function SettingsPage() {
   const [showAddInput, setShowAddInput] = useState(false);
   const [deletingMember, setDeletingMember] = useState<FamilyMember | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-
-  const fetchGroup = useCallback(async () => {
-    setGroupLoading(true);
-    try {
-      const res = await fetch("/api/v1/family");
-      const data = await res.json();
-      if (data.success) setGroup(data.data?.group ?? null);
-    } finally {
-      setGroupLoading(false);
-    }
-  }, []);
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -169,105 +124,8 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    fetchGroup();
     fetchMembers();
-  }, [fetchGroup, fetchMembers]);
-
-  // ── Family Group Actions ─────────────────────────────────────────────────
-
-  async function handleCreateGroup() {
-    setCreating(true);
-    setGroupError("");
-    try {
-      const res = await fetch("/api/v1/family/create", { method: "POST" });
-      const data = await res.json();
-      if (data.success) setGroup(data.data.group);
-      else setGroupError(data.error?.message ?? "เกิดข้อผิดพลาด");
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  async function handleJoinGroup() {
-    if (!joinCode.trim() || joining) return;
-    setJoining(true);
-    setGroupError("");
-    try {
-      const res = await fetch("/api/v1/family/join", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: joinCode.trim() }),
-      });
-      const data = await res.json();
-      if (data.success) { setGroup(data.data.group); setShowJoinInput(false); setJoinCode(""); }
-      else setGroupError(data.error?.message ?? "ไม่พบกลุ่ม");
-    } finally {
-      setJoining(false);
-    }
-  }
-
-  async function handleLeaveGroup() {
-    setLeaving(true);
-    try {
-      const res = await fetch("/api/v1/family/leave", { method: "DELETE" });
-      const data = await res.json();
-      if (data.success) { setGroup(null); setShowLeaveConfirm(false); }
-    } finally {
-      setLeaving(false);
-    }
-  }
-
-  function handleCopyCode() {
-    if (!group) return;
-    navigator.clipboard.writeText(group.inviteCode).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }
-
-  // ── Private Alias Actions (other members only) ───────────────────────────
-  // What YOU privately call this person — visible only to you. Overrides
-  // their shared nickname/name in YOUR view only; nobody else is affected.
-
-  function startEditingAlias(member: FamilyGroupMember) {
-    setEditingAliasFor(member.id);
-    setAliasDraft(member.myAlias ?? "");
-  }
-
-  function cancelEditingAlias() {
-    setEditingAliasFor(null);
-    setAliasDraft("");
-  }
-
-  async function handleSaveAlias(memberId: string) {
-    setSavingAlias(true);
-    try {
-      const trimmed = aliasDraft.trim();
-      const res = await fetch("/api/v1/family/alias", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetUserId: memberId, nickname: trimmed || null }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setGroup((prev) =>
-          prev
-            ? {
-                ...prev,
-                members: prev.members.map((m) =>
-                  m.id === memberId
-                    ? { ...m, myAlias: data.data.nickname, displayName: data.data.nickname ?? m.name }
-                    : m
-                ),
-              }
-            : prev
-        );
-        setEditingAliasFor(null);
-      }
-    } finally {
-      setSavingAlias(false);
-    }
-  }
+  }, [fetchMembers]);
 
   // ── Family Member Tag Actions ────────────────────────────────────────────
 
@@ -473,193 +331,17 @@ export default function SettingsPage() {
           </span>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </Link>
-      </div>
 
-      {/* ─── Family Group ─────────────────────────────────────────────────── */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 px-1">
-          <Link2 className="h-4 w-4 text-muted-foreground" />
-          <p className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide">กลุ่มครอบครัว</p>
-        </div>
-
-        {groupLoading ? (
-          <div className="ios-card px-4 py-8 flex items-center justify-center">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : group ? (
-          <div className="ios-card overflow-hidden">
-            {/* Invite code */}
-            <div className="px-4 py-3.5 flex items-center justify-between border-b border-border/50">
-              <div>
-                <p className="text-[12px] text-muted-foreground font-medium uppercase tracking-wide">รหัสเชิญ</p>
-                <p className="text-[22px] font-bold tracking-[0.2em] text-primary mt-0.5">{group.inviteCode}</p>
-              </div>
-              <button
-                onClick={handleCopyCode}
-                className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-primary/10 text-primary text-[13px] font-semibold active:scale-95 transition-all"
-              >
-                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                {copied ? "คัดลอกแล้ว" : "คัดลอก"}
-              </button>
-            </div>
-
-            {/* Members list */}
-            <div className="divide-y divide-border/50">
-              {group.members.map((m) => (
-                <div key={m.id} className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-[#AF52DE]/10 flex items-center justify-center shrink-0">
-                      <span className="text-[14px]">{m.isMe ? "👤" : "👥"}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-medium truncate">
-                        {m.displayName}
-                        {m.isMe && <span className="ml-1.5 text-[11px] text-muted-foreground font-normal">(คุณ)</span>}
-                      </p>
-                      <p className="text-[12px] text-muted-foreground truncate">{m.email}</p>
-                    </div>
-                  </div>
-
-                  {/* Others only: private alias — what only YOU call them; nobody else sees this.
-                      (Your own display name comes from your profile name in the card above —
-                      no separate "group nickname" to avoid duplication.) */}
-                  {!m.isMe && (
-                    <div className="mt-2 ml-12">
-                      {editingAliasFor === m.id ? (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Input
-                              placeholder={`ชื่อที่อยากเรียก ${m.name} เช่น น้องบี`}
-                              value={aliasDraft}
-                              onChange={(e) => setAliasDraft(e.target.value)}
-                              maxLength={50}
-                              className="h-8 text-[13px] bg-input border-0 rounded-lg flex-1"
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") handleSaveAlias(m.id);
-                                if (e.key === "Escape") cancelEditingAlias();
-                              }}
-                            />
-                            <button
-                              onClick={() => handleSaveAlias(m.id)}
-                              disabled={savingAlias}
-                              className="h-7 w-7 rounded-full bg-[#AF52DE]/10 text-[#AF52DE] flex items-center justify-center"
-                            >
-                              {savingAlias ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                            </button>
-                            <button
-                              onClick={cancelEditingAlias}
-                              className="h-7 w-7 rounded-full hover:bg-muted text-muted-foreground flex items-center justify-center"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground">
-                            🔒 เห็นเฉพาะคุณคนเดียว — {m.name} และคนอื่นในกลุ่มจะไม่เห็นชื่อนี้
-                          </p>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => startEditingAlias(m)}
-                          className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-[#AF52DE] transition-colors"
-                        >
-                          <Pencil className="h-3 w-3" />
-                          {m.myAlias ? `ชื่อที่คุณเรียก: ${m.myAlias} 🔒` : "ตั้งชื่อที่อยากเรียก (ส่วนตัว 🔒)"}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Summary link */}
-            <Link
-              href="/dashboard"
-              className="flex items-center justify-between px-4 py-3 border-t border-border/50 hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex items-center gap-2 text-[13px] font-medium text-[#AF52DE]">
-                <BarChart2 className="h-4 w-4" />
-                ดูสรุปค่าใช้จ่ายครอบครัว
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </Link>
-
-            {/* Leave */}
-            <div className="px-4 py-3 border-t border-border/50">
-              <button
-                onClick={() => setShowLeaveConfirm(true)}
-                className="flex items-center gap-2 text-[13px] text-destructive font-medium hover:opacity-70 transition-opacity"
-              >
-                <Link2Off className="h-4 w-4" />
-                ออกจากกลุ่มครอบครัว
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="ios-card overflow-hidden">
-            <div className="px-4 py-5 text-center space-y-1">
-              <p className="text-[30px]">👨‍👩‍👧‍👦</p>
-              <p className="text-[14px] font-medium">ยังไม่ได้เข้าร่วมกลุ่มครอบครัว</p>
-              <p className="text-[12px] text-muted-foreground">สร้างกลุ่มใหม่ หรือเข้าร่วมด้วยรหัสจากสมาชิก</p>
-            </div>
-
-            {groupError && (
-              <p className="text-[13px] text-destructive text-center px-4 pb-2">{groupError}</p>
-            )}
-
-            {showJoinInput ? (
-              <div className="px-4 pb-4 space-y-2 border-t border-border/50 pt-3">
-                <p className="text-[12px] text-muted-foreground font-medium uppercase tracking-wide">รหัสเชิญ (6 ตัวอักษร)</p>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="เช่น ABC123"
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                    className="flex-1 h-11 bg-input border-0 rounded-xl text-[16px] font-bold tracking-widest uppercase"
-                    maxLength={6}
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleJoinGroup();
-                      if (e.key === "Escape") { setShowJoinInput(false); setJoinCode(""); setGroupError(""); }
-                    }}
-                  />
-                  <button
-                    onClick={handleJoinGroup}
-                    disabled={!joinCode.trim() || joining}
-                    className="h-11 px-4 rounded-xl bg-[#AF52DE] text-white text-[14px] font-semibold disabled:opacity-40 flex items-center gap-1.5"
-                  >
-                    {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : "เข้าร่วม"}
-                  </button>
-                  <button
-                    onClick={() => { setShowJoinInput(false); setJoinCode(""); setGroupError(""); }}
-                    className="h-11 w-11 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="px-4 pb-4 flex gap-2 border-t border-border/50 pt-3">
-                <button
-                  onClick={handleCreateGroup}
-                  disabled={creating}
-                  className="flex-1 h-11 rounded-xl bg-primary text-white text-[14px] font-semibold disabled:opacity-40 flex items-center justify-center gap-2"
-                >
-                  {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                  สร้างกลุ่มใหม่
-                </button>
-                <button
-                  onClick={() => setShowJoinInput(true)}
-                  className="flex-1 h-11 rounded-xl bg-[#AF52DE]/10 text-[#AF52DE] text-[14px] font-semibold flex items-center justify-center gap-2"
-                >
-                  <Link2 className="h-4 w-4" />
-                  เข้าร่วมด้วยรหัส
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        <Link
+          href="/settings/family"
+          className="w-full flex items-center justify-between px-4 py-3 border-t border-border/50 hover:bg-muted/50 transition-colors text-left"
+        >
+          <span className="flex items-center gap-2 text-[14px] font-medium">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            ครอบครัว
+          </span>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </Link>
       </div>
 
       {/* ─── Family Member Tags ────────────────────────────────────────────── */}
@@ -776,27 +458,6 @@ export default function SettingsPage() {
             <Button variant="secondary" onClick={closePasswordDialog} disabled={changingPassword}>ยกเลิก</Button>
             <Button onClick={handleChangePassword} disabled={changingPassword || !currentPassword || !newPassword || !confirmNewPassword}>
               {changingPassword ? "กำลังเปลี่ยน..." : "เปลี่ยนรหัสผ่าน"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Leave group confirm */}
-      <Dialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>ออกจากกลุ่มครอบครัว</DialogTitle>
-            <DialogDescription>
-              เมื่อออกจากกลุ่ม คุณจะไม่เห็นรายการของสมาชิกคนอื่นอีกต่อไป
-              {group && group.members.length === 1 && (
-                <span className="block mt-1 text-[#FF9500]">คุณเป็นสมาชิกคนสุดท้าย กลุ่มจะถูกลบทิ้ง</span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-4 gap-2">
-            <Button variant="secondary" onClick={() => setShowLeaveConfirm(false)} disabled={leaving}>ยกเลิก</Button>
-            <Button variant="destructive" onClick={handleLeaveGroup} disabled={leaving}>
-              {leaving ? "กำลังออก..." : "ออกจากกลุ่ม"}
             </Button>
           </DialogFooter>
         </DialogContent>
