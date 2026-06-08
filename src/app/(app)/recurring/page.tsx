@@ -97,7 +97,7 @@ export default function RecurringPage() {
           <p className="text-[14px] text-muted-foreground mt-1">กด + เพื่อตั้งแจ้งเตือนรายรับ-รายจ่ายประจำ</p>
         </div>
       ) : (
-        <div className="ios-card overflow-hidden divide-y divide-border/50">
+        <div className="ios-card overflow-hidden divide-y divide-border">
           {active.map(item => (
             <RecurringCard key={item.id} item={item} onEdit={() => openEdit(item)} onDelete={() => setDeleting(item)} />
           ))}
@@ -108,7 +108,7 @@ export default function RecurringPage() {
       {inactive.length > 0 && (
         <div className="space-y-2">
           <p className="text-[13px] font-medium text-muted-foreground px-1">หมดอายุ / ปิดใช้งาน</p>
-          <div className="ios-card overflow-hidden divide-y divide-border/50 opacity-60">
+          <div className="ios-card overflow-hidden divide-y divide-border opacity-60">
             {inactive.map(item => (
               <RecurringCard key={item.id} item={item} onEdit={() => openEdit(item)} onDelete={() => setDeleting(item)} />
             ))}

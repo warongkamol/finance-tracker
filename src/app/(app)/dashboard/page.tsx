@@ -164,7 +164,7 @@ function MineGroupSection({ summary, loading }: { summary: Summary | null; loadi
       <p className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide px-1">
         แยกตามกลุ่ม
       </p>
-      <div className="ios-card overflow-hidden divide-y divide-border/50">
+      <div className="ios-card overflow-hidden divide-y divide-border">
         {visible.map((g) => {
           const balPos = g.data.balance >= 0;
           return (
@@ -329,7 +329,7 @@ function UpcomingSection({ payments, loading }: { payments: UpcomingPayment[]; l
         <Link href="/debts" className="text-[13px] text-primary font-medium">ดูทั้งหมด</Link>
       </div>
 
-      <div className="ios-card overflow-hidden divide-y divide-border/50">
+      <div className="ios-card overflow-hidden divide-y divide-border">
         {pending.slice(0, 3).map((p) => (
           <div key={p.id} className="flex items-center gap-3 px-4 py-3">
             {p.isOverdue ? (
@@ -400,7 +400,7 @@ function CategorySection({ title, data, loading }: { title: string; data: Catego
           </div>
 
           {/* List — parent categories, tap to drill into subcategories */}
-          <div className="divide-y divide-border/50">
+          <div className="divide-y divide-border">
             {data.map((item, i) => {
               const fill = item.color ?? CHART_COLORS[i % CHART_COLORS.length];
               const hasChildren = item.children.length > 0;
@@ -444,7 +444,7 @@ function CategorySection({ title, data, loading }: { title: string; data: Catego
 
                   {/* Subcategory drill-down */}
                   {expanded && hasChildren && (
-                    <div className="bg-muted/30 divide-y divide-border/40">
+                    <div className="bg-muted/30 divide-y divide-border">
                       {item.children.map((child) => (
                         <div key={child.categoryId} className="flex items-center gap-2.5 pl-12 pr-4 py-2.5">
                           <div
@@ -554,7 +554,7 @@ function FamilyMemberSection({ data, loading }: { data: FamilySummary | null; lo
       <p className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide px-1">
         สรุปตามสมาชิก
       </p>
-      <div className="ios-card overflow-hidden divide-y divide-border/50">
+      <div className="ios-card overflow-hidden divide-y divide-border">
         {data.members.map((m) => {
           const pct = totalExpense > 0 ? Math.round((m.expense / totalExpense) * 100) : 0;
           const balPos = m.balance >= 0;

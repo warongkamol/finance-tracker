@@ -77,7 +77,7 @@ export default function RegisterPage() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-      <div className="ios-card overflow-hidden divide-y divide-border/60">
+      <div className="ios-card overflow-hidden divide-y divide-border">
         <FieldRow label="ชื่อ" error={errors.name?.message}>
           <Input placeholder="ชื่อของคุณ" autoComplete="name" className={inputClass} {...register("name")} />
         </FieldRow>

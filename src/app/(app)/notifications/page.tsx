@@ -112,7 +112,7 @@ export default function NotificationsPage() {
           <p className="text-[14px] text-muted-foreground mt-1">การแจ้งเตือนจะปรากฏที่นี่</p>
         </div>
       ) : (
-        <div className="ios-card overflow-hidden divide-y divide-border/50">
+        <div className="ios-card overflow-hidden divide-y divide-border">
           {items.map(item => {
             const isActionable = item.type === "RECURRING_REMINDER" || item.type === "DEBT_REMINDER" || item.type === "BUDGET_ALERT";
             return (

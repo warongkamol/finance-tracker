@@ -170,7 +170,7 @@ export default function DebtDetailPage() {
       <div className="space-y-2">
         <p className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide px-1">ตารางผ่อนชำระ</p>
 
-        <div className="ios-card overflow-hidden divide-y divide-border/50">
+        <div className="ios-card overflow-hidden divide-y divide-border">
           {debt.payments.map((payment) => (
             <div
               key={payment.id}

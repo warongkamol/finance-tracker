@@ -150,9 +150,9 @@ export default function DebtsPage() {
           {tab === "ACTIVE" && <p className="text-[14px] text-muted-foreground mt-1">กด + เพื่อเพิ่มรายการผ่อน</p>}
         </div>
       ) : (
-        <div className="ios-card overflow-hidden divide-y divide-border/50">
+        <div className="ios-card overflow-hidden divide-y divide-border">
           {debts.map((debt) => (
-            <Link key={debt.id} href={`/debts/${debt.id}`}>
+            <Link key={debt.id} href={`/debts/${debt.id}`} className="block">
               <div className="px-4 py-4 active:bg-muted/50 transition-colors">
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">

@@ -29,13 +29,22 @@ export async function GET(req: NextRequest) {
   const actualIncome = transactions.filter(t => t.type === "INCOME").reduce((s, t) => s + Number(t.amount), 0);
   const actualExpense = transactions.filter(t => t.type === "EXPENSE").reduce((s, t) => s + Number(t.amount), 0);
 
+  // A budget item pinned to a root category should roll up its children's
+  // actuals too — matches how the dashboard's by-category breakdown sums
+  // (transactions are tagged to leaf categories, but plans are usually made
+  // against the main category).
+  const matchesCategory = (t: (typeof transactions)[number], categoryId: string, isRoot: boolean) =>
+    t.categoryId === categoryId || (isRoot && t.category?.parentId === categoryId);
+
   const items = (budget?.items ?? []).map(item => {
     // Match actual spending for EXPENSE items by category
     let actual = 0;
     if (item.type === "INCOME" && item.categoryId) {
-      actual = transactions.filter(t => t.type === "INCOME" && t.categoryId === item.categoryId).reduce((s, t) => s + Number(t.amount), 0);
+      const isRoot = item.category?.parentId == null;
+      actual = transactions.filter(t => t.type === "INCOME" && matchesCategory(t, item.categoryId!, isRoot)).reduce((s, t) => s + Number(t.amount), 0);
     } else if (item.type === "EXPENSE" && item.categoryId) {
-      actual = transactions.filter(t => t.type === "EXPENSE" && t.categoryId === item.categoryId).reduce((s, t) => s + Number(t.amount), 0);
+      const isRoot = item.category?.parentId == null;
+      actual = transactions.filter(t => t.type === "EXPENSE" && matchesCategory(t, item.categoryId!, isRoot)).reduce((s, t) => s + Number(t.amount), 0);
     } else if (item.type === "INCOME") {
       actual = actualIncome;
     } else if (item.type === "EXPENSE") {

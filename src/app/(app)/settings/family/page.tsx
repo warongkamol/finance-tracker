@@ -435,7 +435,7 @@ export default function FamilySettingsPage() {
               </div>
 
               {/* Members — existing inline private-member-alias editor, unchanged */}
-              <div className="divide-y divide-border/50">
+              <div className="divide-y divide-border">
                 {selectedGroup.members.map((m) => (
                   <div key={m.id} className="px-4 py-3">
                     <div className="flex items-center gap-3">

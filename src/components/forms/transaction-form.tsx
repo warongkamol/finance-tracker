@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { createTransactionSchema, type CreateTransactionInput } from "@/lib/validations/transaction";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectSeparator } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Loader2, Users } from "lucide-react";
 
@@ -227,9 +227,11 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
                 filteredCategories.map((cat) =>
                   cat.children.length > 0 ? (
                     <SelectGroup key={cat.id}>
-                      <SelectLabel>{cat.icon ? `${cat.icon} ${cat.name}` : cat.name}</SelectLabel>
+                      <SelectItem value={cat.id} className="font-semibold">
+                        {cat.icon ? `${cat.icon} ${cat.name}` : cat.name}
+                      </SelectItem>
                       {cat.children.map((child) => (
-                        <SelectItem key={child.id} value={child.id}>
+                        <SelectItem key={child.id} value={child.id} className="pl-10">
                           {child.icon ? `${child.icon} ${child.name}` : child.name}
                         </SelectItem>
                       ))}

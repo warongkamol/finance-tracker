@@ -47,7 +47,7 @@ function LoginForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
       {/* Fields card */}
-      <div className="ios-card overflow-hidden divide-y divide-border/60">
+      <div className="ios-card overflow-hidden divide-y divide-border">
         {/* Email */}
         <div className="px-4 py-1">
           <label className="text-[12px] font-medium text-muted-foreground uppercase tracking-wide">อีเมล</label>

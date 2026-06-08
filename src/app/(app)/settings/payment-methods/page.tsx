@@ -86,7 +86,7 @@ export default function PaymentMethodsSettingsPage() {
           <p className="text-[14px] text-muted-foreground mt-1">กด + เพื่อเพิ่มช่องทางชำระเงิน</p>
         </div>
       ) : (
-        <div className="ios-card overflow-hidden divide-y divide-border/50">
+        <div className="ios-card overflow-hidden divide-y divide-border">
           {items.map((item) => (
             <div key={item.id} className="flex items-center gap-3 px-4 py-3">
               <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">

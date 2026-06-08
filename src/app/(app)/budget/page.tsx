@@ -265,7 +265,7 @@ function BudgetDashboardSection({
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="divide-y divide-border/50">
+          <div className="divide-y divide-border">
             {typeSlices.map((s) => {
               const pct = outflowTotal > 0 ? Math.round((s.value / outflowTotal) * 100) : 0;
               return (
@@ -861,7 +861,7 @@ export default function BudgetPage() {
                       รวม {formatCurrency(items.reduce((s, { item }) => s + item.amount, 0))}
                     </span>
                   </div>
-                  <div className="ios-card overflow-hidden divide-y divide-border/50">
+                  <div className="ios-card overflow-hidden divide-y divide-border">
                     {items.map(({ item, idx }) => (
                       editingIdx === idx ? (
                         <div key={idx} className="p-2">
@@ -1131,7 +1131,7 @@ export default function BudgetPage() {
               {comparison.items.length > 0 && (
                 <div className="space-y-1">
                   <p className="text-[13px] font-medium text-muted-foreground px-1">รายละเอียดแต่ละรายการ</p>
-                  <div className="ios-card overflow-hidden divide-y divide-border/50">
+                  <div className="ios-card overflow-hidden divide-y divide-border">
                     {comparison.items.map(item => (
                       <div key={item.id} className={cn("px-4 py-3", item.isOver && "bg-destructive/5")}>
                         <div className="flex items-center justify-between gap-2">

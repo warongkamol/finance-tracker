@@ -172,7 +172,7 @@ export default function CategoriesSettingsPage() {
           <p className="text-[14px] text-muted-foreground mt-1">กด + เพื่อเพิ่มหมวดหมู่{type === "INCOME" ? "รายรับ" : "รายจ่าย"}</p>
         </div>
       ) : (
-        <div className="ios-card overflow-hidden divide-y divide-border/50">
+        <div className="ios-card overflow-hidden divide-y divide-border">
           {categories.map((cat) => (
             <div key={cat.id}>
               <CategoryRow cat={cat} onEdit={() => openEditParent(cat)} onDelete={() => openDelete(cat)} />

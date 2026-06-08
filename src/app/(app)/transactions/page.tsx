@@ -313,7 +313,7 @@ export default function TransactionsPage() {
             <p className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide">รายการผ่อนเดือนนี้</p>
             <Link href="/debts" className="text-[13px] text-primary font-medium">ดูทั้งหมด</Link>
           </div>
-          <div className="ios-card overflow-hidden divide-y divide-border/50">
+          <div className="ios-card overflow-hidden divide-y divide-border">
             {pendingPayments.map((p) => (
               <div key={p.id} className="flex items-center gap-3 px-4 py-3">
                 {p.isOverdue
@@ -357,7 +357,7 @@ export default function TransactionsPage() {
           {sortedDates.map((date) => (
             <div key={date}>
               <p className="text-[13px] font-semibold text-muted-foreground px-1 mb-2">{formatShortDate(date)}</p>
-              <div className="ios-card overflow-hidden divide-y divide-border/50">
+              <div className="ios-card overflow-hidden divide-y divide-border">
                 {grouped[date].map((tx) => (
                   <div key={tx.id} className="flex items-center gap-3 px-4 py-3">
                     {/* Icon */}
