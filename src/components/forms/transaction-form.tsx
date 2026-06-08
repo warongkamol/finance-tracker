@@ -28,6 +28,12 @@ interface FamilyMember {
   name: string;
 }
 
+interface FamilyGroup {
+  id: string;
+  name: string;
+  displayName: string;
+}
+
 interface PrefillValues {
   type?: "INCOME" | "EXPENSE";
   amount?: number;
@@ -48,6 +54,7 @@ interface TransactionFormProps {
     isFamily?: boolean;
     familyMemberId?: string | null;
     familyMember?: { id: string; name: string } | null;
+    familyGroupId?: string | null;
   };
   prefill?: PrefillValues;
   onSuccess: () => void;
@@ -81,6 +88,8 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [isFamily, setIsFamily] = useState(defaultValues?.isFamily ?? false);
   const [familyMemberId, setFamilyMemberId] = useState<string | null>(defaultValues?.familyMemberId ?? null);
+  const [familyGroups, setFamilyGroups] = useState<FamilyGroup[]>([]);
+  const [familyGroupId, setFamilyGroupId] = useState<string | null>(defaultValues?.familyGroupId ?? null);
   const [loadingData, setLoadingData] = useState(true);
   const [serverError, setServerError] = useState("");
 
@@ -101,17 +110,20 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
   useEffect(() => {
     async function loadData() {
       try {
-        const [catRes, pmRes, fmRes] = await Promise.all([
+        const [catRes, pmRes, fmRes, fgRes] = await Promise.all([
           fetch("/api/v1/categories"),
           fetch("/api/v1/payment-methods"),
           fetch("/api/v1/family-members"),
+          fetch("/api/v1/family"),
         ]);
         const catData = await catRes.json();
         const pmData = await pmRes.json();
         const fmData = await fmRes.json();
+        const fgData = await fgRes.json();
         if (catData.success) setCategories(catData.data);
         if (pmData.success) setPaymentMethods(pmData.data);
         if (fmData.success) setFamilyMembers(fmData.data);
+        if (fgData.success) setFamilyGroups(fgData.data.groups);
       } finally {
         setLoadingData(false);
       }
@@ -138,6 +150,7 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
           ...data,
           isFamily,
           familyMemberId: isFamily ? familyMemberId : null,
+          familyGroupId: isFamily ? familyGroupId : null,
         }),
       });
       const json = await res.json();
@@ -288,6 +301,23 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
               <SelectItem value="none">ไม่ระบุสมาชิก</SelectItem>
               {familyMembers.map((m) => (
                 <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {isFamily && familyGroups.length > 0 && (
+          <Select
+            value={familyGroupId ?? "none"}
+            onValueChange={(val) => setFamilyGroupId(val === "none" ? null : val)}
+          >
+            <SelectTrigger className="bg-input h-11 rounded-xl border-0">
+              <SelectValue placeholder="บันทึกเข้ากลุ่มครอบครัวไหน" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">ไม่ระบุ</SelectItem>
+              {familyGroups.map((g) => (
+                <SelectItem key={g.id} value={g.id}>{g.displayName}</SelectItem>
               ))}
             </SelectContent>
           </Select>
