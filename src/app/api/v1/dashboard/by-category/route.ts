@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma, TransactionType } from "@/generated/prisma/client";
-import { getFamilyMemberIds } from "@/lib/family";
+import { getUserFamilyGroups } from "@/lib/family";
 
 interface CategoryChildData {
   categoryId: string;
@@ -135,8 +135,19 @@ export async function GET(req: NextRequest) {
 
     let where: Prisma.TransactionWhereInput;
     if (familyFilter === "family") {
-      const txUserIds = await getFamilyMemberIds(session.user.id);
-      where = { userId: { in: txUserIds }, type, isFamily: true, date: dateRange };
+      const familyGroupIdParam = searchParams.get("familyGroupId");
+      if (familyGroupIdParam) {
+        const myGroups = await getUserFamilyGroups(session.user.id);
+        if (!myGroups.some((g) => g.id === familyGroupIdParam)) {
+          return NextResponse.json(
+            { success: false, error: { code: "FORBIDDEN", message: "คุณไม่ได้อยู่ในกลุ่มนี้" } },
+            { status: 403 }
+          );
+        }
+        where = { familyGroupId: familyGroupIdParam, type, date: dateRange };
+      } else {
+        where = { userId: session.user.id, type, isFamily: true, date: dateRange };
+      }
     } else {
       where = { userId: session.user.id, type, date: dateRange };
     }
