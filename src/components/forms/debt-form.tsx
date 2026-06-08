@@ -6,13 +6,21 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { createDebtSchema, type CreateDebtInput } from "@/lib/validations/debt";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
+
+interface FamilyGroup {
+  id: string;
+  name: string;
+  displayName: string;
+}
 
 interface DebtFormProps {
   onSuccess: () => void;
   onCancel: () => void;
   inFamilyGroup?: boolean;
+  familyGroups?: FamilyGroup[];
 }
 
 function todayString(): string {
@@ -32,10 +40,11 @@ function FormRow({ label, error, children }: { label: string; error?: string; ch
 
 const fieldClass = "bg-input h-11 rounded-xl border-0";
 
-export function DebtForm({ onSuccess, onCancel, inFamilyGroup = false }: DebtFormProps) {
+export function DebtForm({ onSuccess, onCancel, inFamilyGroup = false, familyGroups = [] }: DebtFormProps) {
   const [serverError, setServerError] = useState("");
   const [useCustomMonthly, setUseCustomMonthly] = useState(false);
   const [isFamily, setIsFamily] = useState(false);
+  const [familyGroupId, setFamilyGroupId] = useState<string | null>(null);
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<CreateDebtInput>({
     resolver: zodResolver(createDebtSchema),
@@ -55,6 +64,7 @@ export function DebtForm({ onSuccess, onCancel, inFamilyGroup = false }: DebtFor
         ...data,
         monthlyAmount: useCustomMonthly ? data.monthlyAmount : null,
         isFamily,
+        familyGroupId: isFamily ? familyGroupId : null,
       };
       const res = await fetch("/api/v1/debts", {
         method: "POST",
@@ -147,6 +157,23 @@ export function DebtForm({ onSuccess, onCancel, inFamilyGroup = false }: DebtFor
                 )} />
               </button>
             </label>
+
+            {isFamily && familyGroups.length > 0 && (
+              <Select
+                value={familyGroupId ?? "none"}
+                onValueChange={(val) => setFamilyGroupId(val === "none" ? null : val)}
+              >
+                <SelectTrigger className="bg-input h-11 rounded-xl border-0 mt-3">
+                  <SelectValue placeholder="บันทึกเข้ากลุ่มครอบครัวไหน" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">ไม่ระบุ</SelectItem>
+                  {familyGroups.map((g) => (
+                    <SelectItem key={g.id} value={g.id}>{g.displayName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         )}
       </div>
