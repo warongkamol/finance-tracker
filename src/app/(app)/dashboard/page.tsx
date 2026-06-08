@@ -21,6 +21,7 @@ import {
 import { formatCurrency, getMonthName, getCurrentMonth, cn } from "@/lib/utils";
 import { buildFilename, captureAsImage, captureAsPDF } from "@/lib/export";
 import Link from "next/link";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type FamilyFilterType = "all" | "mine" | "family";
 
@@ -616,6 +617,8 @@ export default function DashboardPage() {
   const [year, setYear] = useState(now.year);
   const [month, setMonth] = useState(now.month);
   const [familyFilter, setFamilyFilter] = useState<FamilyFilterType>("all");
+  const [familyGroups, setFamilyGroups] = useState<{ id: string; name: string; displayName: string }[]>([]);
+  const [selectedFamilyGroupId, setSelectedFamilyGroupId] = useState<string | null>(null);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -635,7 +638,8 @@ export default function DashboardPage() {
 
   const fetchMonthData = useCallback(async () => {
     setLoadingMonth(true);
-    const ff = familyFilter !== "all" ? `&familyFilter=${familyFilter}` : "";
+    const groupQs = familyFilter === "family" && selectedFamilyGroupId ? `&familyGroupId=${selectedFamilyGroupId}` : "";
+    const ff = familyFilter !== "all" ? `&familyFilter=${familyFilter}${groupQs}` : "";
     try {
       const [sumRes, catRes, upRes] = await Promise.all([
         fetch(`/api/v1/dashboard/summary?year=${year}&month=${month}${ff}`),
@@ -657,7 +661,7 @@ export default function DashboardPage() {
     } finally {
       setLoadingMonth(false);
     }
-  }, [year, month, familyFilter]);
+  }, [year, month, familyFilter, selectedFamilyGroupId]);
 
   const fetchYearData = useCallback(async () => {
     setLoadingYear(true);
@@ -674,17 +678,29 @@ export default function DashboardPage() {
     }
   }, [year]);
 
+  useEffect(() => {
+    fetch("/api/v1/family")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) {
+          const groups = d.data.groups as { id: string; name: string; displayName: string }[];
+          setFamilyGroups(groups);
+          setSelectedFamilyGroupId((prev) => prev ?? groups[0]?.id ?? null);
+        }
+      });
+  }, []);
+
   useEffect(() => { fetchMonthData(); }, [fetchMonthData]);
   useEffect(() => { if (mode === "year") fetchYearData(); }, [mode, fetchYearData]);
 
   useEffect(() => {
-    if (familyFilter !== "family") { setFamilySummary(null); return; }
+    if (familyFilter !== "family" || !selectedFamilyGroupId) { setFamilySummary(null); return; }
     setLoadingFamily(true);
-    fetch(`/api/v1/family/summary?year=${year}&month=${month}`)
+    fetch(`/api/v1/family/summary?year=${year}&month=${month}&groupId=${selectedFamilyGroupId}`)
       .then((r) => r.json())
       .then((d) => { if (d.success) setFamilySummary(d.data); })
       .finally(() => setLoadingFamily(false));
-  }, [familyFilter, year, month]);
+  }, [familyFilter, selectedFamilyGroupId, year, month]);
 
   async function handleExport(format: "image" | "pdf") {
     if (!contentRef.current || isExporting) return;
@@ -799,6 +815,21 @@ export default function DashboardPage() {
             </button>
           ))}
         </div>
+
+        {/* Group picker — which group's shared DATA to view. Independent of
+            the settings-page picker and the entry-form picker (no sync). */}
+        {familyFilter === "family" && familyGroups.length > 0 && (
+          <Select value={selectedFamilyGroupId ?? undefined} onValueChange={setSelectedFamilyGroupId}>
+            <SelectTrigger className="h-10 bg-input border-0 rounded-xl text-[13px]">
+              <SelectValue placeholder="เลือกกลุ่ม" />
+            </SelectTrigger>
+            <SelectContent>
+              {familyGroups.map((g) => (
+                <SelectItem key={g.id} value={g.id}>{g.displayName}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {/* Period navigator */}
         <div className="flex items-center justify-between px-1">
