@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
       where: {
         userId: session.user.id,
         type: "EXPENSE",
+        categoryId: { not: null },
         date: { gte: startDate, lt: endDate },
       },
       _sum: { amount: true },
@@ -42,7 +43,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, data: { data: [], categories: [] } });
     }
 
-    const categoryIds = topCategories.map((c) => c.categoryId);
+    const categoryIds = topCategories
+      .map((c) => c.categoryId)
+      .filter((id): id is string => id !== null);
 
     const [categories, transactions] = await Promise.all([
       prisma.category.findMany({
@@ -75,6 +78,7 @@ export async function GET(req: NextRequest) {
     }
 
     for (const tx of transactions) {
+      if (tx.categoryId === null) continue;
       const d = new Date(tx.date);
       const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}`;
       if (totals[tx.categoryId] !== undefined) {

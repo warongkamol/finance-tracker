@@ -23,12 +23,14 @@ interface CategoryData extends CategoryChildData {
 async function aggregateByCategory(where: Prisma.TransactionWhereInput): Promise<CategoryData[]> {
   const grouped = await prisma.transaction.groupBy({
     by: ["categoryId"],
-    where,
+    where: { ...where, categoryId: { not: null } },
     _sum: { amount: true },
   });
   if (grouped.length === 0) return [];
 
-  const categoryIds = grouped.map((g) => g.categoryId);
+  const categoryIds = grouped
+    .map((g) => g.categoryId)
+    .filter((id): id is string => id !== null);
   const categories = await prisma.category.findMany({
     where: { id: { in: categoryIds } },
     select: { id: true, name: true, icon: true, color: true, parentId: true },
@@ -58,6 +60,7 @@ async function aggregateByCategory(where: Prisma.TransactionWhereInput): Promise
   const roots = new Map<string, RootAgg>();
 
   for (const g of grouped) {
+    if (g.categoryId === null) continue;
     const amount = Number(g._sum.amount ?? 0);
     const cat = catMap.get(g.categoryId);
     if (!cat) continue;
