@@ -201,9 +201,9 @@ model Transfer {
   userId        String   @map("user_id")
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   fromAccountId String   @map("from_account_id")
-  fromAccount   Account  @relation("TransferFrom", fields: [fromAccountId], references: [id])
+  fromAccount   Account  @relation("TransferFrom", fields: [fromAccountId], references: [id], onDelete: Restrict)
   toAccountId   String   @map("to_account_id")
-  toAccount     Account  @relation("TransferTo", fields: [toAccountId], references: [id])
+  toAccount     Account  @relation("TransferTo", fields: [toAccountId], references: [id], onDelete: Restrict)
   amount        Decimal  @db.Decimal(12, 2)
   date          DateTime @db.Date
   note          String?
@@ -212,6 +212,8 @@ model Transfer {
   createdAt     DateTime @default(now()) @map("created_at")
 
   @@index([userId])
+  @@index([fromAccountId])
+  @@index([toAccountId])
   @@map("transfers")
 }
 
