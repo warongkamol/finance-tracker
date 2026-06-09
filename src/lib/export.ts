@@ -4,28 +4,27 @@ export function buildFilename(type: string, year: number, month?: number): strin
 }
 
 export async function captureAsImage(element: HTMLElement, filename: string): Promise<void> {
-  const { default: html2canvas } = await import("html2canvas");
-  const canvas = await html2canvas(element, {
+  const { domToBlob } = await import("modern-screenshot");
+  const blob = await domToBlob(element, {
     scale: 2,
-    useCORS: true,
     backgroundColor: "#ffffff",
-    logging: false,
   });
+  if (!blob) throw new Error("captureAsImage: domToBlob returned null");
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.download = `${filename}.png`;
-  link.href = canvas.toDataURL("image/png");
+  link.href = url;
   link.click();
+  URL.revokeObjectURL(url);
 }
 
 export async function captureAsPDF(element: HTMLElement, filename: string): Promise<void> {
-  const { default: html2canvas } = await import("html2canvas");
+  const { domToCanvas } = await import("modern-screenshot");
   const { jsPDF } = await import("jspdf");
 
-  const canvas = await html2canvas(element, {
+  const canvas = await domToCanvas(element, {
     scale: 2,
-    useCORS: true,
     backgroundColor: "#ffffff",
-    logging: false,
   });
 
   const imgData = canvas.toDataURL("image/png");
