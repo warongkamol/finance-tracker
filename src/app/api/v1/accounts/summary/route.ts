@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-
-function getCycleStart(statementDay: number): Date {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const day = now.getDate();
-  if (day >= statementDay) return new Date(Date.UTC(year, month, statementDay));
-  return new Date(Date.UTC(year, month - 1, statementDay));
-}
+import { getCycleStart } from "@/lib/utils";
 
 export async function GET(_req: NextRequest) {
   try {
@@ -57,23 +49,18 @@ export async function GET(_req: NextRequest) {
     );
     const liquidTotal = liquidBalances.reduce((sum, b) => sum + b, 0);
 
-    let creditUsed = 0;
-    let creditLimit = 0;
-    for (const acc of creditAccounts) {
-      creditLimit += Number(acc.creditLimit ?? 0);
-      if (acc.statementDay) {
+    const creditResults = await Promise.all(
+      creditAccounts.map(async (acc) => {
+        if (!acc.statementDay) return { creditUsed: 0, creditLimit: Number(acc.creditLimit ?? 0) };
         const result = await prisma.transaction.aggregate({
-          where: {
-            accountId: acc.id,
-            type: "EXPENSE",
-            isTransfer: false,
-            date: { gte: getCycleStart(acc.statementDay) },
-          },
+          where: { accountId: acc.id, type: "EXPENSE", isTransfer: false, date: { gte: getCycleStart(acc.statementDay) } },
           _sum: { amount: true },
         });
-        creditUsed += Number(result._sum.amount ?? 0);
-      }
-    }
+        return { creditUsed: Number(result._sum.amount ?? 0), creditLimit: Number(acc.creditLimit ?? 0) };
+      })
+    );
+    const creditUsed = creditResults.reduce((sum, r) => sum + r.creditUsed, 0);
+    const creditLimit = creditResults.reduce((sum, r) => sum + r.creditLimit, 0);
 
     return NextResponse.json({
       success: true,

@@ -2,17 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createAccountSchema } from "@/lib/validations/account";
-
-function getCycleStart(statementDay: number): Date {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const day = now.getDate();
-  if (day >= statementDay) {
-    return new Date(Date.UTC(year, month, statementDay));
-  }
-  return new Date(Date.UTC(year, month - 1, statementDay));
-}
+import { getCycleStart } from "@/lib/utils";
 
 async function computeAccountBalance(
   accountId: string,
