@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { type, amount, description, date, categoryId, paymentMethodId, isFamily, familyMemberId, familyGroupId } = parsed.data;
+    const { type, amount, description, date, categoryId, paymentMethodId, isFamily, familyMemberId, familyGroupId, accountId } = parsed.data;
 
     // familyGroupId controls cross-user visibility — verify membership before
     // trusting a client-supplied value.
@@ -165,6 +165,7 @@ export async function POST(req: NextRequest) {
         isFamily: isFamily ?? false,
         familyMemberId: isFamily ? (familyMemberId ?? null) : null,
         familyGroupId: isFamily ? (familyGroupId ?? null) : null,
+        accountId: accountId ?? null,
       },
       include: {
         category: { select: { id: true, name: true, icon: true, color: true } },

@@ -70,7 +70,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       );
     }
 
-    const { type, amount, description, date, categoryId, paymentMethodId, isFamily, familyMemberId, familyGroupId } = parsed.data;
+    const { type, amount, description, date, categoryId, paymentMethodId, isFamily, familyMemberId, familyGroupId, accountId } = parsed.data;
 
     // familyGroupId controls cross-user visibility — verify membership before
     // trusting a client-supplied value (mirrors the POST route's check).
@@ -129,6 +129,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       updateData.familyMemberId = isFamily ? (familyMemberId ?? null) : null;
       updateData.familyGroupId = isFamily ? (familyGroupId ?? null) : null;
     }
+    if (accountId !== undefined) updateData.accountId = accountId;
 
     const transaction = await prisma.transaction.update({
       where: { id },
