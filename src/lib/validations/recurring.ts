@@ -6,6 +6,7 @@ export const recurringSchema = z.object({
   amount: z.number().positive("จำนวนเงินต้องมากกว่า 0"),
   categoryId: z.string().min(1, "กรุณาเลือกหมวดหมู่"),
   paymentMethodId: z.string().optional().nullable(),
+  accountId: z.string().cuid().nullable().optional(),
   frequency: z.enum(["MONTHLY", "YEARLY"]),
   reminderDay: z.number().int().min(1).max(28),
   isLastDayOfMonth: z.boolean(),
