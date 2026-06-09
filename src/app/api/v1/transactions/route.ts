@@ -46,14 +46,14 @@ export async function GET(req: NextRequest) {
             { status: 403 }
           );
         }
-        where = { familyGroupId: familyGroupIdParam, date: { gte: startDate, lt: endDate } };
+        where = { familyGroupId: familyGroupIdParam, date: { gte: startDate, lt: endDate }, isTransfer: false };
       } else {
-        where = { userId: session.user.id, isFamily: true, date: { gte: startDate, lt: endDate } };
+        where = { userId: session.user.id, isFamily: true, date: { gte: startDate, lt: endDate }, isTransfer: false };
       }
     } else if (familyFilter === "mine") {
-      where = { userId: session.user.id, isFamily: false, date: { gte: startDate, lt: endDate } };
+      where = { userId: session.user.id, isFamily: false, date: { gte: startDate, lt: endDate }, isTransfer: false };
     } else {
-      where = { userId: session.user.id, date: { gte: startDate, lt: endDate } };
+      where = { userId: session.user.id, date: { gte: startDate, lt: endDate }, isTransfer: false };
     }
 
     if (typeParam === "INCOME" || typeParam === "EXPENSE") {

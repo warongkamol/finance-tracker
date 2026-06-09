@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
     const baseWhere = {
       userId: session.user.id,
       date: { gte: startDate, lt: endDate },
+      isTransfer: false,
     };
 
     const [incomeResult, expenseResult] = await prisma.$transaction([

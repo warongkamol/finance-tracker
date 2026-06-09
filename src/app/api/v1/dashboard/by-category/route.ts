@@ -130,8 +130,8 @@ export async function GET(req: NextRequest) {
     // split into two groups so each can be reviewed separately.
     if (familyFilter === "mine") {
       const [personal, family] = await Promise.all([
-        aggregateByCategory({ userId: session.user.id, type, isFamily: false, date: dateRange }),
-        aggregateByCategory({ userId: session.user.id, type, isFamily: true, date: dateRange }),
+        aggregateByCategory({ userId: session.user.id, type, isFamily: false, date: dateRange, isTransfer: false }),
+        aggregateByCategory({ userId: session.user.id, type, isFamily: true, date: dateRange, isTransfer: false }),
       ]);
       return NextResponse.json({ success: true, data: { personal, family } });
     }
@@ -147,12 +147,12 @@ export async function GET(req: NextRequest) {
             { status: 403 }
           );
         }
-        where = { familyGroupId: familyGroupIdParam, type, date: dateRange };
+        where = { familyGroupId: familyGroupIdParam, type, date: dateRange, isTransfer: false };
       } else {
-        where = { userId: session.user.id, type, isFamily: true, date: dateRange };
+        where = { userId: session.user.id, type, isFamily: true, date: dateRange, isTransfer: false };
       }
     } else {
-      where = { userId: session.user.id, type, date: dateRange };
+      where = { userId: session.user.id, type, date: dateRange, isTransfer: false };
     }
 
     const data = await aggregateByCategory(where);
