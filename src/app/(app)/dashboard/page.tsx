@@ -633,6 +633,14 @@ export default function DashboardPage() {
   const [familySummary, setFamilySummary] = useState<FamilySummary | null>(null);
   const [loadingFamily, setLoadingFamily] = useState(false);
 
+  const [walletSummary, setWalletSummary] = useState<{
+    liquidTotal: number;
+    creditUsed: number;
+    creditLimit: number;
+    hasCreditCards: boolean;
+  } | null>(null);
+  const [walletLoading, setWalletLoading] = useState(true);
+
   const [loadingMonth, setLoadingMonth] = useState(true);
   const [loadingYear, setLoadingYear] = useState(true);
 
@@ -692,6 +700,13 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchMonthData(); }, [fetchMonthData]);
   useEffect(() => { if (mode === "year") fetchYearData(); }, [mode, fetchYearData]);
+
+  useEffect(() => {
+    fetch("/api/v1/accounts/summary")
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setWalletSummary(d.data); })
+      .finally(() => setWalletLoading(false));
+  }, []);
 
   useEffect(() => {
     if (familyFilter !== "family" || !selectedFamilyGroupId) { setFamilySummary(null); return; }
@@ -841,6 +856,37 @@ export default function DashboardPage() {
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>
+
+        {/* Wallet summary card */}
+        {walletLoading ? (
+          <div className="ios-card mx-0 px-4 py-3 space-y-2">
+            <div className="h-3.5 w-20 bg-muted rounded animate-pulse" />
+            <div className="h-3.5 w-32 bg-muted rounded animate-pulse" />
+          </div>
+        ) : walletSummary ? (
+          <div className="ios-card px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[13px] font-semibold text-foreground">กระเป๋าเงิน</p>
+              <Link href="/accounts" className="text-[12px] text-primary">ดูทั้งหมด →</Link>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[13px] text-muted-foreground">💰 เงินสด</span>
+              <span className="text-[13px] font-semibold tabular-nums">
+                {formatCurrency(walletSummary.liquidTotal)}
+              </span>
+            </div>
+            {walletSummary.hasCreditCards && (
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-[13px] text-muted-foreground">💳 บัตรเครดิต</span>
+                <span className="text-[13px] font-semibold tabular-nums text-[#FF3B30]">
+                  {formatCurrency(walletSummary.creditUsed)}
+                  {" / "}
+                  {formatCurrency(walletSummary.creditLimit)}
+                </span>
+              </div>
+            )}
+          </div>
+        ) : null}
 
         {/* Month view */}
         {mode === "month" && (
