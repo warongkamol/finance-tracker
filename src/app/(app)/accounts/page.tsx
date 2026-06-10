@@ -36,21 +36,24 @@ export default function AccountsPage() {
   const [onboardBalances, setOnboardBalances] = useState<Record<string, string>>({});
 
   async function load() {
-    const res = await fetch("/api/v1/accounts");
-    const json = await res.json();
-    if (json.success) {
-      setAccounts(json.data);
-      // Show onboarding if never dismissed and all initialBalances are 0
-      const neverOnboarded = !localStorage.getItem("wallet_onboarded");
-      const allZero = json.data.length > 0 && json.data.every((a: Account) => a.initialBalance === 0);
-      if (neverOnboarded && allZero) {
-        const initial: Record<string, string> = {};
-        json.data.forEach((a: Account) => { initial[a.id] = ""; });
-        setOnboardBalances(initial);
-        setOnboardOpen(true);
+    try {
+      const res = await fetch("/api/v1/accounts");
+      const json = await res.json();
+      if (json.success) {
+        setAccounts(json.data);
+        // Show onboarding if never dismissed and all initialBalances are 0
+        const neverOnboarded = !localStorage.getItem("wallet_onboarded");
+        const allZero = json.data.length > 0 && json.data.every((a: Account) => a.initialBalance === 0);
+        if (neverOnboarded && allZero) {
+          const initial: Record<string, string> = {};
+          json.data.forEach((a: Account) => { initial[a.id] = ""; });
+          setOnboardBalances(initial);
+          setOnboardOpen(true);
+        }
       }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   useEffect(() => { load(); }, []);
