@@ -88,7 +88,7 @@ export function RecurringForm({ initial, onSuccess, onCancel }: RecurringFormPro
       if (d.success) {
         setAccounts(d.data);
         const defaultAccount = d.data?.find((a: Account) => a.isDefault) ?? d.data?.[0];
-        if (defaultAccount && !initial?.accountId) {
+        if (defaultAccount && !isEdit) {
           setValue("accountId", defaultAccount.id);
         }
       }

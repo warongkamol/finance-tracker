@@ -705,6 +705,7 @@ export default function DashboardPage() {
     fetch("/api/v1/accounts/summary")
       .then((r) => r.json())
       .then((d) => { if (d.success) setWalletSummary(d.data); })
+      .catch(() => {})
       .finally(() => setWalletLoading(false));
   }, []);
 

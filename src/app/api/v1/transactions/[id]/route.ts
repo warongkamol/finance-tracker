@@ -21,6 +21,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       include: {
         category: { select: { id: true, name: true, icon: true, color: true } },
         paymentMethod: { select: { id: true, name: true } },
+        account: { select: { id: true, name: true } },
       },
     });
 
@@ -117,6 +118,18 @@ export async function PUT(req: NextRequest, { params }: Params) {
       }
     }
 
+    if (accountId) {
+      const account = await prisma.account.findFirst({
+        where: { id: accountId, userId: session.user.id },
+      });
+      if (!account) {
+        return NextResponse.json(
+          { success: false, error: { code: "NOT_FOUND", message: "ไม่พบกระเป๋าเงิน" } },
+          { status: 404 }
+        );
+      }
+    }
+
     const updateData: Record<string, unknown> = {};
     if (type !== undefined) updateData.type = type;
     if (amount !== undefined) updateData.amount = amount;
@@ -137,6 +150,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       include: {
         category: { select: { id: true, name: true, icon: true, color: true } },
         paymentMethod: { select: { id: true, name: true } },
+        account: { select: { id: true, name: true } },
         familyMember: { select: { id: true, name: true } },
       },
     });

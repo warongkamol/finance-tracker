@@ -52,7 +52,7 @@ async function computeCycleUsed(
   return Number(result._sum.amount ?? 0);
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await auth();
     if (!session?.user?.id) {

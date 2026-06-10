@@ -26,7 +26,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: parsed.error.flatten() }, { status: 422 });
   }
 
-  const { startDate, endDate, paymentMethodId, ...rest } = parsed.data;
+  const { startDate, endDate, paymentMethodId, accountId, ...rest } = parsed.data;
+
+  if (accountId) {
+    const account = await prisma.account.findFirst({
+      where: { id: accountId, userId: session.user.id },
+    });
+    if (!account) {
+      return NextResponse.json({ success: false, error: { code: "NOT_FOUND", message: "ไม่พบกระเป๋าเงิน" } }, { status: 404 });
+    }
+  }
 
   const item = await prisma.recurringTransaction.create({
     data: {
@@ -34,6 +43,7 @@ export async function POST(req: Request) {
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       paymentMethodId: paymentMethodId || null,
+      accountId: accountId ?? null,
       userId: session.user.id,
     },
     include: { category: true, paymentMethod: true },

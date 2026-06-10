@@ -133,7 +133,7 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
         if (accData.success) {
           setAccounts(accData.data);
           const defaultAccount = accData.data?.find((a: Account) => a.isDefault) ?? accData.data?.[0];
-          if (defaultAccount && !defaultValues?.accountId && !prefill?.accountId) {
+          if (defaultAccount && !isEdit && !prefill?.accountId) {
             setValue("accountId", defaultAccount.id);
           }
         }

@@ -74,6 +74,7 @@ export async function GET(req: NextRequest) {
       include: {
         category: { select: { id: true, name: true, icon: true, color: true } },
         paymentMethod: { select: { id: true, name: true } },
+        account: { select: { id: true, name: true } },
         debtPayment: { select: { id: true, installmentNo: true, debt: { select: { id: true, name: true } } } },
         familyMember: { select: { id: true, name: true } },
         user: { select: { id: true, name: true } },
@@ -148,6 +149,18 @@ export async function POST(req: NextRequest) {
       if (!pm) {
         return NextResponse.json(
           { success: false, error: { code: "NOT_FOUND", message: "ไม่พบช่องทางการชำระเงิน" } },
+          { status: 404 }
+        );
+      }
+    }
+
+    if (accountId) {
+      const account = await prisma.account.findFirst({
+        where: { id: accountId, userId: session.user.id },
+      });
+      if (!account) {
+        return NextResponse.json(
+          { success: false, error: { code: "NOT_FOUND", message: "ไม่พบกระเป๋าเงิน" } },
           { status: 404 }
         );
       }
