@@ -75,7 +75,7 @@ export function TransferForm({ open, onClose, onSuccess, defaultFromAccountId }:
       const res = await fetch("/api/v1/accounts/transfer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, amount: Number(data.amount) }),
+        body: JSON.stringify(data),
       });
       const json = await res.json();
       if (!json.success) { setServerError(json.error?.message ?? "เกิดข้อผิดพลาด"); return; }
@@ -132,6 +132,8 @@ export function TransferForm({ open, onClose, onSuccess, defaultFromAccountId }:
               {...register("amount", { valueAsNumber: true })}
               type="number"
               inputMode="decimal"
+              step="0.01"
+              min="0.01"
               placeholder="0.00"
               className="ios-card"
             />

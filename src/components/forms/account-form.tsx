@@ -130,6 +130,7 @@ export function AccountForm({ open, onClose, onSuccess, initialAccount }: Accoun
               {...register("initialBalance", { valueAsNumber: true })}
               type="number"
               inputMode="decimal"
+              step="0.01"
               placeholder="0"
               className="ios-card"
             />
@@ -142,6 +143,8 @@ export function AccountForm({ open, onClose, onSuccess, initialAccount }: Accoun
                   {...register("creditLimit", { valueAsNumber: true })}
                   type="number"
                   inputMode="decimal"
+                  step="0.01"
+                  min="0.01"
                   placeholder="50000"
                   className="ios-card"
                 />
