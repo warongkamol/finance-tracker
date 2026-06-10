@@ -18,10 +18,16 @@ interface Category {
   children: { id: string; name: string; icon: string | null }[];
 }
 
-interface PaymentMethod {
+interface Account {
   id: string;
   name: string;
+  type: string;
+  isDefault: boolean;
 }
+
+const TYPE_EMOJI: Record<string, string> = {
+  CASH: "💵", BANK_ACCOUNT: "🏦", SAVINGS: "💰", E_WALLET: "📱", CREDIT_CARD: "💳",
+};
 
 interface FamilyMember {
   id: string;
@@ -39,6 +45,7 @@ interface PrefillValues {
   amount?: number;
   categoryId?: string;
   paymentMethodId?: string | null;
+  accountId?: string | null;
   description?: string;
 }
 
@@ -51,6 +58,7 @@ interface TransactionFormProps {
     date: string;
     categoryId: string;
     paymentMethodId: string | null;
+    accountId?: string | null;
     isFamily?: boolean;
     familyMemberId?: string | null;
     familyMember?: { id: string; name: string } | null;
@@ -84,7 +92,7 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
   const isEdit = !!defaultValues;
   const [txType, setTxType] = useState<"INCOME" | "EXPENSE">(defaultValues?.type ?? prefill?.type ?? "EXPENSE");
   const [categories, setCategories] = useState<Category[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [isFamily, setIsFamily] = useState(defaultValues?.isFamily ?? false);
   const [familyMemberId, setFamilyMemberId] = useState<string | null>(defaultValues?.familyMemberId ?? null);
@@ -102,6 +110,7 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
       date: defaultValues?.date ? toDateInputValue(defaultValues.date) : todayString(),
       categoryId: defaultValues?.categoryId ?? prefill?.categoryId ?? "",
       paymentMethodId: defaultValues?.paymentMethodId ?? prefill?.paymentMethodId ?? null,
+      accountId: defaultValues?.accountId ?? prefill?.accountId ?? null,
     },
   });
 
@@ -110,18 +119,24 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
   useEffect(() => {
     async function loadData() {
       try {
-        const [catRes, pmRes, fmRes, fgRes] = await Promise.all([
+        const [catRes, accRes, fmRes, fgRes] = await Promise.all([
           fetch("/api/v1/categories"),
-          fetch("/api/v1/payment-methods"),
+          fetch("/api/v1/accounts"),
           fetch("/api/v1/family-members"),
           fetch("/api/v1/family"),
         ]);
         const catData = await catRes.json();
-        const pmData = await pmRes.json();
+        const accData = await accRes.json();
         const fmData = await fmRes.json();
         const fgData = await fgRes.json();
         if (catData.success) setCategories(catData.data);
-        if (pmData.success) setPaymentMethods(pmData.data);
+        if (accData.success) {
+          setAccounts(accData.data);
+          const defaultAccount = accData.data?.find((a: Account) => a.isDefault) ?? accData.data?.[0];
+          if (defaultAccount && !isEdit && !prefill?.accountId) {
+            setValue("accountId", defaultAccount.id);
+          }
+        }
         if (fmData.success) setFamilyMembers(fmData.data);
         if (fgData.success) setFamilyGroups(fgData.data.groups);
       } finally {
@@ -252,15 +267,20 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
           <Input type="date" className={cn("bg-input h-11 rounded-xl border-0", errors.date && "ring-2 ring-destructive")} {...register("date")} />
         </FormRow>
 
-        <FormRow label="ช่องทางการชำระ">
-          <Select value={watch("paymentMethodId") ?? "none"} onValueChange={(val) => setValue("paymentMethodId", val === "none" ? null : val)}>
-            <SelectTrigger className="bg-input h-11 rounded-xl border-0">
-              <SelectValue placeholder="ไม่ระบุ" />
+        <FormRow label="ชำระด้วย" error={errors.accountId?.message}>
+          <Select
+            value={watch("accountId") ?? "none"}
+            onValueChange={(val) => setValue("accountId", val === "none" ? null : val, { shouldValidate: true })}
+          >
+            <SelectTrigger className={cn("bg-input h-11 rounded-xl border-0", errors.accountId && "ring-2 ring-destructive")}>
+              <SelectValue placeholder="เลือกกระเป๋าเงิน" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">ไม่ระบุ</SelectItem>
-              {paymentMethods.map((pm) => (
-                <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>
+              {accounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {TYPE_EMOJI[a.type] ?? "💰"} {a.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

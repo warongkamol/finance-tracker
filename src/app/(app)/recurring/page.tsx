@@ -22,6 +22,7 @@ interface RecurringItem {
   notes: string | null;
   category: { id: string; name: string; icon: string | null };
   paymentMethod: { id: string; name: string } | null;
+  accountId: string | null;
 }
 
 function Skeleton({ className }: { className?: string }) {
@@ -136,6 +137,7 @@ export default function RecurringPage() {
               amount: Number(editing.amount),
               categoryId: editing.category.id,
               paymentMethodId: editing.paymentMethod?.id ?? null,
+              accountId: editing.accountId ?? null,
               frequency: editing.frequency,
               reminderDay: editing.reminderDay,
               isLastDayOfMonth: editing.isLastDayOfMonth,

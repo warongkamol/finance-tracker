@@ -35,6 +35,8 @@ interface Transaction {
   category: { id: string; name: string; icon: string | null; color: string | null };
   paymentMethodId: string | null;
   paymentMethod: { id: string; name: string } | null;
+  accountId: string | null;
+  account: { id: string; name: string } | null;
   debtPaymentId: string | null;
   debtPayment: { id: string; installmentNo: number; debt: { id: string; name: string } } | null;
   isFamily: boolean;
@@ -384,7 +386,7 @@ export default function TransactionsPage() {
                         )}
                       </div>
                       <p className="text-[12px] text-muted-foreground truncate">
-                        {tx.debtPayment ? tx.debtPayment.debt.name : (tx.description ?? tx.paymentMethod?.name ?? "")}
+                        {tx.debtPayment ? tx.debtPayment.debt.name : (tx.description ?? tx.account?.name ?? tx.paymentMethod?.name ?? "")}
                       </p>
                     </div>
 
@@ -482,7 +484,7 @@ export default function TransactionsPage() {
                     : (tx.description ?? "-")}
                 </td>
                 <td style={{ padding: "7px 10px", borderBottom: "1px solid #eee", color: "#555" }}>
-                  {tx.paymentMethod?.name ?? "-"}
+                  {tx.account?.name ?? tx.paymentMethod?.name ?? "-"}
                 </td>
                 <td style={{ padding: "7px 10px", borderBottom: "1px solid #eee" }}>
                   <span style={{

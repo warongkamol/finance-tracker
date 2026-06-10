@@ -13,6 +13,7 @@ export const createTransactionSchema = z.object({
   isFamily: z.boolean().optional(),
   familyMemberId: z.string().min(1).nullable().optional(),
   familyGroupId: z.string().min(1).nullable().optional(),
+  accountId: z.string().cuid().nullable().optional(),
 });
 
 export const updateTransactionSchema = createTransactionSchema.partial();

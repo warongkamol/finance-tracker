@@ -10,7 +10,16 @@ import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 
 interface Category { id: string; name: string; type: string; icon?: string | null }
-interface PaymentMethod { id: string; name: string }
+interface Account {
+  id: string;
+  name: string;
+  type: string;
+  isDefault: boolean;
+}
+
+const TYPE_EMOJI: Record<string, string> = {
+  CASH: "💵", BANK_ACCOUNT: "🏦", SAVINGS: "💰", E_WALLET: "📱", CREDIT_CARD: "💳",
+};
 
 interface RecurringFormProps {
   initial?: Partial<RecurringInput & { id: string }>;
@@ -43,7 +52,7 @@ const fieldClass = "bg-input h-11 rounded-xl border-0";
 
 export function RecurringForm({ initial, onSuccess, onCancel }: RecurringFormProps) {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [serverError, setServerError] = useState("");
   const isEdit = !!initial?.id;
 
@@ -57,6 +66,7 @@ export function RecurringForm({ initial, onSuccess, onCancel }: RecurringFormPro
       amount: initial?.amount ?? undefined,
       categoryId: initial?.categoryId ?? "",
       paymentMethodId: initial?.paymentMethodId ?? null,
+      accountId: initial?.accountId ?? null,
       frequency: initial?.frequency ?? "MONTHLY",
       reminderDay: initial?.reminderDay ?? 1,
       isLastDayOfMonth: initial?.isLastDayOfMonth ?? false,
@@ -74,8 +84,14 @@ export function RecurringForm({ initial, onSuccess, onCancel }: RecurringFormPro
     fetch("/api/v1/categories").then(r => r.json()).then(d => {
       if (d.success) setCategories(d.data);
     });
-    fetch("/api/v1/payment-methods").then(r => r.json()).then(d => {
-      if (d.success) setPaymentMethods(d.data);
+    fetch("/api/v1/accounts").then(r => r.json()).then(d => {
+      if (d.success) {
+        setAccounts(d.data);
+        const defaultAccount = d.data?.find((a: Account) => a.isDefault) ?? d.data?.[0];
+        if (defaultAccount && !isEdit) {
+          setValue("accountId", defaultAccount.id);
+        }
+      }
     });
   }, []);
 
@@ -155,12 +171,12 @@ export function RecurringForm({ initial, onSuccess, onCancel }: RecurringFormPro
           )} />
         </FormRow>
 
-        <FormRow label="ช่องทางชำระเงิน">
-          <Controller name="paymentMethodId" control={control} render={({ field }) => (
-            <select {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value || null)} className={cn(fieldClass, "w-full px-3 text-[15px]")}>
-              <option value="">-- ไม่ระบุ --</option>
-              {paymentMethods.map(pm => (
-                <option key={pm.id} value={pm.id}>{pm.name}</option>
+        <FormRow label="ชำระด้วย" error={errors.accountId?.message}>
+          <Controller name="accountId" control={control} render={({ field }) => (
+            <select {...field} value={field.value ?? "none"} onChange={e => field.onChange(e.target.value === "none" ? null : e.target.value)} className={cn(fieldClass, "w-full px-3 text-[15px]")}>
+              <option value="none">-- ไม่ระบุ --</option>
+              {accounts.map(a => (
+                <option key={a.id} value={a.id}>{TYPE_EMOJI[a.type] ?? "💰"} {a.name}</option>
               ))}
             </select>
           )} />

@@ -46,14 +46,14 @@ export async function GET(req: NextRequest) {
             { status: 403 }
           );
         }
-        where = { familyGroupId: familyGroupIdParam, date: { gte: startDate, lt: endDate } };
+        where = { familyGroupId: familyGroupIdParam, date: { gte: startDate, lt: endDate }, isTransfer: false };
       } else {
-        where = { userId: session.user.id, isFamily: true, date: { gte: startDate, lt: endDate } };
+        where = { userId: session.user.id, isFamily: true, date: { gte: startDate, lt: endDate }, isTransfer: false };
       }
     } else if (familyFilter === "mine") {
-      where = { userId: session.user.id, isFamily: false, date: { gte: startDate, lt: endDate } };
+      where = { userId: session.user.id, isFamily: false, date: { gte: startDate, lt: endDate }, isTransfer: false };
     } else {
-      where = { userId: session.user.id, date: { gte: startDate, lt: endDate } };
+      where = { userId: session.user.id, date: { gte: startDate, lt: endDate }, isTransfer: false };
     }
 
     if (typeParam === "INCOME" || typeParam === "EXPENSE") {
@@ -74,6 +74,7 @@ export async function GET(req: NextRequest) {
       include: {
         category: { select: { id: true, name: true, icon: true, color: true } },
         paymentMethod: { select: { id: true, name: true } },
+        account: { select: { id: true, name: true } },
         debtPayment: { select: { id: true, installmentNo: true, debt: { select: { id: true, name: true } } } },
         familyMember: { select: { id: true, name: true } },
         user: { select: { id: true, name: true } },
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { type, amount, description, date, categoryId, paymentMethodId, isFamily, familyMemberId, familyGroupId } = parsed.data;
+    const { type, amount, description, date, categoryId, paymentMethodId, isFamily, familyMemberId, familyGroupId, accountId } = parsed.data;
 
     // familyGroupId controls cross-user visibility — verify membership before
     // trusting a client-supplied value.
@@ -153,6 +154,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (accountId) {
+      const account = await prisma.account.findFirst({
+        where: { id: accountId, userId: session.user.id },
+      });
+      if (!account) {
+        return NextResponse.json(
+          { success: false, error: { code: "NOT_FOUND", message: "ไม่พบกระเป๋าเงิน" } },
+          { status: 404 }
+        );
+      }
+    }
+
     const transaction = await prisma.transaction.create({
       data: {
         type,
@@ -165,6 +178,7 @@ export async function POST(req: NextRequest) {
         isFamily: isFamily ?? false,
         familyMemberId: isFamily ? (familyMemberId ?? null) : null,
         familyGroupId: isFamily ? (familyGroupId ?? null) : null,
+        accountId: accountId ?? null,
       },
       include: {
         category: { select: { id: true, name: true, icon: true, color: true } },

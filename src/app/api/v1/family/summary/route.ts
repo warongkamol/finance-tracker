@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     const [txGroups, memberUsers, myAliases] = await Promise.all([
       prisma.transaction.groupBy({
         by: ["userId", "type"],
-        where: { familyGroupId: groupId, date: { gte: startDate, lt: endDate } },
+        where: { familyGroupId: groupId, date: { gte: startDate, lt: endDate }, isTransfer: false },
         _sum: { amount: true },
       }),
       prisma.user.findMany({

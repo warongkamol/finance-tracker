@@ -54,3 +54,12 @@ export function formatMonthYear(year: number, month: number): string {
     new Date(year, month - 1, 1)
   );
 }
+
+export function getCycleStart(statementDay: number): Date {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const day = now.getDate();
+  if (day >= statementDay) return new Date(Date.UTC(year, month, statementDay));
+  return new Date(Date.UTC(year, month - 1, statementDay));
+}
