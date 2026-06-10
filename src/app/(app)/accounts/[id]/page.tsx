@@ -66,11 +66,16 @@ export default function AccountDetailPage() {
   async function handleDelete() {
     setDeleteLoading(true);
     setDeleteError("");
-    const res = await fetch(`/api/v1/accounts/${params.id}`, { method: "DELETE" });
-    const json = await res.json();
-    if (json.success) { router.push("/accounts"); return; }
-    setDeleteError(json.error?.message ?? "เกิดข้อผิดพลาด");
-    setDeleteLoading(false);
+    try {
+      const res = await fetch(`/api/v1/accounts/${params.id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (json.success) { router.push("/accounts"); return; }
+      setDeleteError(json.error?.message ?? "เกิดข้อผิดพลาด");
+    } catch {
+      setDeleteError("เกิดข้อผิดพลาด กรุณาลองใหม่");
+    } finally {
+      setDeleteLoading(false);
+    }
   }
 
   if (loading || !account) {
