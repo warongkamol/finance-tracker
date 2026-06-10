@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { Pencil, Trash2, Plus, Check, X, Loader2, Users, LogOut, User, ChevronRight, FolderTree, Wallet } from "lucide-react";
+import { Pencil, Trash2, Plus, Check, X, Loader2, Users, LogOut, User, ChevronRight, FolderTree, Wallet, BellRing } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -328,6 +328,17 @@ export default function SettingsPage() {
           <span className="flex items-center gap-2 text-[14px] font-medium">
             <Wallet className="h-4 w-4 text-muted-foreground" />
             ช่องทางชำระเงิน
+          </span>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </Link>
+
+        <Link
+          href="/recurring"
+          className="w-full flex items-center justify-between px-4 py-3 border-t border-border/50 hover:bg-muted/50 transition-colors text-left"
+        >
+          <span className="flex items-center gap-2 text-[14px] font-medium">
+            <BellRing className="h-4 w-4 text-muted-foreground" />
+            การแจ้งเตือนซ้ำ
           </span>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </Link>
