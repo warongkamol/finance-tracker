@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { AccountType } from "@/generated/prisma/client";
 
 const SEED_USER_ID = "seed-default-user";
 
@@ -69,4 +70,25 @@ export async function cloneDefaultsForUser(userId: string) {
       },
     });
   }
+
+  // Starter wallet + credit card so the wallet onboarding flow has something
+  // to ask an initial balance for
+  await prisma.account.createMany({
+    data: [
+      {
+        name: "เงินสด",
+        type: AccountType.CASH,
+        isDefault: true,
+        sortOrder: 1,
+        userId,
+      },
+      {
+        name: "บัตรเครดิต",
+        type: AccountType.CREDIT_CARD,
+        isDefault: false,
+        sortOrder: 2,
+        userId,
+      },
+    ],
+  });
 }
