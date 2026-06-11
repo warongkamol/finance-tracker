@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getCycleStart } from "@/lib/utils";
 import { computeAccountBalance } from "@/lib/account-balance";
 
 export async function GET(_req: NextRequest) {
@@ -50,18 +49,7 @@ export async function GET(_req: NextRequest) {
     );
     const liquidTotal = liquidBalances.reduce((sum, b) => sum + b, 0);
 
-    const creditResults = await Promise.all(
-      creditAccounts.map(async (acc) => {
-        if (!acc.statementDay) return { creditUsed: 0, creditLimit: Number(acc.creditLimit ?? 0) };
-        const result = await prisma.transaction.aggregate({
-          where: { accountId: acc.id, type: "EXPENSE", isTransfer: false, date: { gte: getCycleStart(acc.statementDay) } },
-          _sum: { amount: true },
-        });
-        return { creditUsed: Number(result._sum.amount ?? 0), creditLimit: Number(acc.creditLimit ?? 0) };
-      })
-    );
-    const creditUsed = creditResults.reduce((sum, r) => sum + r.creditUsed, 0);
-    const creditLimit = creditResults.reduce((sum, r) => sum + r.creditLimit, 0);
+    const creditLimit = creditAccounts.reduce((sum, acc) => sum + Number(acc.creditLimit ?? 0), 0);
 
     const creditOutstandingResults = await Promise.all(
       creditAccounts.map(async (acc) => {
@@ -75,7 +63,6 @@ export async function GET(_req: NextRequest) {
       success: true,
       data: {
         liquidTotal,
-        creditUsed,
         creditLimit,
         creditOutstanding,
         hasCreditCards: creditAccounts.length > 0,
