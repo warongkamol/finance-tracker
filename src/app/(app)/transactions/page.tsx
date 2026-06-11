@@ -36,7 +36,7 @@ interface Transaction {
   paymentMethodId: string | null;
   paymentMethod: { id: string; name: string } | null;
   accountId: string | null;
-  account: { id: string; name: string } | null;
+  account: { id: string; name: string; type: string } | null;
   debtPaymentId: string | null;
   debtPayment: { id: string; installmentNo: number; debt: { id: string; name: string } } | null;
   isFamily: boolean;
@@ -382,6 +382,11 @@ export default function TransactionsPage() {
                         {tx.isFamily && (
                           <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#AF52DE]/15 text-[#AF52DE]">
                             👨‍👩‍👧 {tx.familyMember?.name ?? (tx.userId !== session?.user?.id ? tx.user.name : "ครอบครัว")}
+                          </span>
+                        )}
+                        {tx.account?.type === "CREDIT_CARD" && (
+                          <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#FF3B30]/15 text-[#FF3B30]">
+                            💳 บัตรเครดิต
                           </span>
                         )}
                       </div>

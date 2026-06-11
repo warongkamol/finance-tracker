@@ -107,12 +107,22 @@ function Skeleton({ className }: { className?: string }) {
 
 // ─── Balance Hero ─────────────────────────────────────────────────────────────
 
-function BalanceHero({ summary, loading }: { summary: Summary | null; loading: boolean }) {
-  if (loading || !summary) {
+function BalanceHero({
+  summary,
+  loading,
+  walletSummary,
+  walletLoading,
+}: {
+  summary: Summary | null;
+  loading: boolean;
+  walletSummary: { liquidTotal: number; creditOutstanding: number; hasCreditCards: boolean } | null;
+  walletLoading: boolean;
+}) {
+  if (loading || !summary || walletLoading || !walletSummary) {
     return <Skeleton className="h-36" />;
   }
 
-  const isPositive = summary.balance >= 0;
+  const isPositive = walletSummary.liquidTotal >= 0;
 
   return (
     <div className="ios-card px-5 py-5 space-y-4">
@@ -122,8 +132,16 @@ function BalanceHero({ summary, loading }: { summary: Summary | null; loading: b
           "text-[36px] font-bold tracking-tight tabular-nums mt-0.5",
           isPositive ? "text-primary" : "text-destructive"
         )}>
-          {formatCurrency(summary.balance)}
+          {formatCurrency(walletSummary.liquidTotal)}
         </p>
+        {walletSummary.hasCreditCards && (
+          <div className="flex items-center justify-between mt-1.5">
+            <span className="text-[12px] text-muted-foreground">ยอดบัตรเครดิตค้างจ่าย</span>
+            <span className="text-[14px] font-semibold tabular-nums text-destructive">
+              {formatCurrency(walletSummary.creditOutstanding)}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3">
@@ -637,6 +655,7 @@ export default function DashboardPage() {
     liquidTotal: number;
     creditUsed: number;
     creditLimit: number;
+    creditOutstanding: number;
     hasCreditCards: boolean;
   } | null>(null);
   const [walletLoading, setWalletLoading] = useState(true);
@@ -892,7 +911,12 @@ export default function DashboardPage() {
         {/* Month view */}
         {mode === "month" && (
           <>
-            <BalanceHero summary={summary} loading={loadingMonth} />
+            <BalanceHero
+              summary={summary}
+              loading={loadingMonth}
+              walletSummary={walletSummary}
+              walletLoading={walletLoading}
+            />
             {familyFilter === "mine" && (
               <MineGroupSection summary={summary} loading={loadingMonth} />
             )}
