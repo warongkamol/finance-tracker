@@ -17,7 +17,6 @@ interface Account {
   balance: number;
   initialBalance: number;
   creditLimit: number | null;
-  cycleUsed: number | null;
   statementDay: number | null;
   isDefault: boolean;
 }
@@ -134,13 +133,13 @@ export default function AccountsPage() {
                   <p className="text-[13px] text-muted-foreground">
                     ใช้ไป{" "}
                     <span className="text-[#FF3B30] font-semibold">
-                      {formatCurrency(acc.cycleUsed ?? 0)}
+                      {formatCurrency(Math.max(0, -acc.balance))}
                     </span>
                   </p>
                   <div className="mt-1 w-28 h-1.5 bg-secondary rounded-full overflow-hidden">
                     <div
                       className="h-full bg-[#FF3B30] rounded-full"
-                      style={{ width: `${Math.min(100, ((acc.cycleUsed ?? 0) / acc.creditLimit) * 100)}%` }}
+                      style={{ width: `${Math.min(100, (Math.max(0, -acc.balance) / acc.creditLimit) * 100)}%` }}
                     />
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-0.5">
