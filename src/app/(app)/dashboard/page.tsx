@@ -653,7 +653,6 @@ export default function DashboardPage() {
 
   const [walletSummary, setWalletSummary] = useState<{
     liquidTotal: number;
-    creditUsed: number;
     creditLimit: number;
     creditOutstanding: number;
     hasCreditCards: boolean;
@@ -899,7 +898,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between mt-1">
                 <span className="text-[13px] text-muted-foreground">💳 บัตรเครดิต</span>
                 <span className="text-[13px] font-semibold tabular-nums text-[#FF3B30]">
-                  {formatCurrency(walletSummary.creditUsed)}
+                  {formatCurrency(walletSummary.creditOutstanding)}
                   {" / "}
                   {formatCurrency(walletSummary.creditLimit)}
                 </span>
