@@ -2,55 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createAccountSchema } from "@/lib/validations/account";
-import { getCycleStart } from "@/lib/utils";
-
-async function computeAccountBalance(
-  accountId: string,
-  initialBalance: number
-): Promise<number> {
-  const [income, expense, tfOut, tfIn] = await Promise.all([
-    prisma.transaction.aggregate({
-      where: { accountId, type: "INCOME", isTransfer: false },
-      _sum: { amount: true },
-    }),
-    prisma.transaction.aggregate({
-      where: { accountId, type: "EXPENSE", isTransfer: false },
-      _sum: { amount: true },
-    }),
-    prisma.transfer.aggregate({
-      where: { fromAccountId: accountId },
-      _sum: { amount: true },
-    }),
-    prisma.transfer.aggregate({
-      where: { toAccountId: accountId },
-      _sum: { amount: true },
-    }),
-  ]);
-  return (
-    initialBalance +
-    Number(income._sum.amount ?? 0) -
-    Number(expense._sum.amount ?? 0) -
-    Number(tfOut._sum.amount ?? 0) +
-    Number(tfIn._sum.amount ?? 0)
-  );
-}
-
-async function computeCycleUsed(
-  accountId: string,
-  statementDay: number
-): Promise<number> {
-  const cycleStart = getCycleStart(statementDay);
-  const result = await prisma.transaction.aggregate({
-    where: {
-      accountId,
-      type: "EXPENSE",
-      isTransfer: false,
-      date: { gte: cycleStart },
-    },
-    _sum: { amount: true },
-  });
-  return Number(result._sum.amount ?? 0);
-}
+import { computeAccountBalance } from "@/lib/account-balance";
 
 export async function GET() {
   try {
@@ -71,10 +23,6 @@ export async function GET() {
           acc.id,
           Number(acc.initialBalance)
         );
-        const cycleUsed =
-          acc.type === "CREDIT_CARD" && acc.statementDay
-            ? await computeCycleUsed(acc.id, acc.statementDay)
-            : null;
         return {
           id: acc.id,
           name: acc.name,
@@ -82,7 +30,6 @@ export async function GET() {
           balance,
           initialBalance: Number(acc.initialBalance),
           creditLimit: acc.creditLimit ? Number(acc.creditLimit) : null,
-          cycleUsed,
           statementDay: acc.statementDay,
           paymentDueDay: acc.paymentDueDay,
           isDefault: acc.isDefault,

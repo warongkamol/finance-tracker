@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
       include: {
         category: { select: { id: true, name: true, icon: true, color: true } },
         paymentMethod: { select: { id: true, name: true } },
-        account: { select: { id: true, name: true } },
+        account: { select: { id: true, name: true, type: true } },
         debtPayment: { select: { id: true, installmentNo: true, debt: { select: { id: true, name: true } } } },
         familyMember: { select: { id: true, name: true } },
         user: { select: { id: true, name: true } },
