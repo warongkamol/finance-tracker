@@ -26,6 +26,7 @@ interface TransferFormProps {
   onClose: () => void;
   onSuccess: () => void;
   defaultFromAccountId?: string;
+  defaultToAccountId?: string;
 }
 
 const TYPE_EMOJI: Record<string, string> = {
@@ -47,7 +48,7 @@ function FormRow({ label, error, children }: { label: string; error?: string; ch
   );
 }
 
-export function TransferForm({ open, onClose, onSuccess, defaultFromAccountId }: TransferFormProps) {
+export function TransferForm({ open, onClose, onSuccess, defaultFromAccountId, defaultToAccountId }: TransferFormProps) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [serverError, setServerError] = useState("");
 
@@ -55,7 +56,7 @@ export function TransferForm({ open, onClose, onSuccess, defaultFromAccountId }:
     resolver: zodResolver(transferSchema),
     defaultValues: {
       fromAccountId: defaultFromAccountId ?? "",
-      toAccountId: "",
+      toAccountId: defaultToAccountId ?? "",
       amount: undefined,
       date: todayString(),
       note: "",
