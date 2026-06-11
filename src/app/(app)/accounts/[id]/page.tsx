@@ -120,14 +120,14 @@ export default function AccountDetailPage() {
         )}
       </div>
 
-      {/* Transfer button */}
+      {/* Transfer / pay button */}
       <Button
         variant="secondary"
         className="w-full gap-2"
         onClick={() => setTransferOpen(true)}
       >
         <ArrowLeftRight className="h-4 w-4" />
-        โอนออก
+        {isCreditCard ? "ชำระบัตรเครดิต" : "โอนออก"}
       </Button>
 
       {/* Recent transactions */}
@@ -176,7 +176,9 @@ export default function AccountDetailPage() {
         open={transferOpen}
         onClose={() => setTransferOpen(false)}
         onSuccess={load}
-        defaultFromAccountId={account.id}
+        {...(isCreditCard
+          ? { defaultToAccountId: account.id }
+          : { defaultFromAccountId: account.id })}
       />
 
       <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
