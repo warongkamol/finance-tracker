@@ -191,6 +191,7 @@ model Account {
   recurringTxns RecurringTransaction[]
   transfersFrom Transfer[]   @relation("TransferFrom")
   transfersTo   Transfer[]   @relation("TransferTo")
+  debts         Debt[]
 
   @@index([userId])
   @@map("accounts")
@@ -311,6 +312,8 @@ model Debt {
   status        DebtStatus   @default(ACTIVE)
   userId        String       @map("user_id")
   user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId     String?      @map("account_id")
+  account       Account?     @relation(fields: [accountId], references: [id])
 
   payments    DebtPayment[]
   budgetItems BudgetItem[]
@@ -320,6 +323,7 @@ model Debt {
 
   @@index([userId, status])
   @@index([familyGroupId])
+  @@index([accountId])
   @@map("debts")
 }
 
