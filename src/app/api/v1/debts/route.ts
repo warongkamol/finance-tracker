@@ -175,6 +175,7 @@ export async function POST(req: NextRequest) {
       return tx.debt.findUnique({
         where: { id: created.id },
         include: {
+          account: { select: { id: true, name: true } },
           payments: { orderBy: { installmentNo: "asc" } },
         },
       });
