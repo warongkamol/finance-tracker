@@ -136,7 +136,7 @@ function BalanceHero({
         </p>
         {walletSummary.hasCreditCards && (
           <div className="flex items-center justify-between mt-1.5">
-            <span className="text-[12px] text-muted-foreground">ยอดบัตรเครดิตค้างจ่าย</span>
+            <span className="text-[12px] text-muted-foreground">ยอดบัตรเครดิต/สินเชื่อค้างจ่าย</span>
             <span className="text-[14px] font-semibold tabular-nums text-destructive">
               {formatCurrency(walletSummary.creditOutstanding)}
             </span>
@@ -896,7 +896,7 @@ export default function DashboardPage() {
             </div>
             {walletSummary.hasCreditCards && (
               <div className="flex items-center justify-between mt-1">
-                <span className="text-[13px] text-muted-foreground">💳 บัตรเครดิต</span>
+                <span className="text-[13px] text-muted-foreground">💳 บัตรเครดิต/สินเชื่อ</span>
                 <span className="text-[13px] font-semibold tabular-nums text-[#FF3B30]">
                   {formatCurrency(walletSummary.creditOutstanding)}
                   {walletSummary.creditLimit > 0 && (

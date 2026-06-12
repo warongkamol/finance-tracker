@@ -37,7 +37,7 @@ const TYPE_EMOJI: Record<string, string> = {
   CASH: "💵", BANK_ACCOUNT: "🏦", SAVINGS: "💰", E_WALLET: "📱", CREDIT_CARD: "💳",
 };
 const TYPE_LABEL: Record<string, string> = {
-  CASH: "เงินสด", BANK_ACCOUNT: "บัญชีธนาคาร", SAVINGS: "ออมทรัพย์", E_WALLET: "E-Wallet", CREDIT_CARD: "บัตรเครดิต",
+  CASH: "เงินสด", BANK_ACCOUNT: "บัญชีธนาคาร", SAVINGS: "ออมทรัพย์", E_WALLET: "E-Wallet", CREDIT_CARD: "บัตรเครดิต/สินเชื่อ",
 };
 
 export default function AccountDetailPage() {
@@ -127,7 +127,7 @@ export default function AccountDetailPage() {
         onClick={() => setTransferOpen(true)}
       >
         <ArrowLeftRight className="h-4 w-4" />
-        {isCreditCard ? "ชำระบัตรเครดิต" : "โอนออก"}
+        {isCreditCard ? "ชำระบัตรเครดิต/สินเชื่อ" : "โอนออก"}
       </Button>
 
       {/* Recent transactions */}

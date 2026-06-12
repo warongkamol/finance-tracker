@@ -386,7 +386,7 @@ export default function TransactionsPage() {
                         )}
                         {tx.account?.type === "CREDIT_CARD" && (
                           <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#FF3B30]/15 text-[#FF3B30]">
-                            💳 บัตรเครดิต
+                            💳 บัตรเครดิต/สินเชื่อ
                           </span>
                         )}
                       </div>
