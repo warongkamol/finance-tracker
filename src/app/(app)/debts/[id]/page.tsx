@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock, AlertCircle, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -27,6 +28,7 @@ interface Debt {
   endDate: string;
   notes: string | null;
   status: "ACTIVE" | "COMPLETED" | "CANCELLED";
+  account: { id: string; name: string } | null;
   payments: DebtPayment[];
   paidCount: number;
   remainingBalance: number;
@@ -163,6 +165,15 @@ export default function DebtDetailPage() {
 
         {debt.notes && (
           <p className="text-[13px] text-muted-foreground">{debt.notes}</p>
+        )}
+
+        {debt.account && (
+          <Link
+            href={`/accounts/${debt.account.id}`}
+            className="block text-[13px] text-primary"
+          >
+            ผ่อนผ่าน: 💳 {debt.account.name}
+          </Link>
         )}
       </div>
 

@@ -20,6 +20,7 @@ export async function GET(
     const debt = await prisma.debt.findFirst({
       where: { id, userId: session.user.id },
       include: {
+        account: { select: { id: true, name: true } },
         payments: {
           include: { transaction: { select: { id: true } } },
           orderBy: { installmentNo: "asc" },

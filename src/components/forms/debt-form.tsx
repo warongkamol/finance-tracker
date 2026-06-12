@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createDebtSchema, type CreateDebtInput } from "@/lib/validations/debt";
@@ -14,6 +14,12 @@ interface FamilyGroup {
   id: string;
   name: string;
   displayName: string;
+}
+
+interface CreditAccount {
+  id: string;
+  name: string;
+  type: string;
 }
 
 interface DebtFormProps {
@@ -45,11 +51,22 @@ export function DebtForm({ onSuccess, onCancel, inFamilyGroup = false, familyGro
   const [useCustomMonthly, setUseCustomMonthly] = useState(false);
   const [isFamily, setIsFamily] = useState(false);
   const [familyGroupId, setFamilyGroupId] = useState<string | null>(null);
+  const [creditAccounts, setCreditAccounts] = useState<CreditAccount[]>([]);
 
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<CreateDebtInput>({
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<CreateDebtInput>({
     resolver: zodResolver(createDebtSchema),
-    defaultValues: { startDate: todayString(), totalMonths: 12 },
+    defaultValues: { startDate: todayString(), totalMonths: 12, accountId: null },
   });
+
+  useEffect(() => {
+    fetch("/api/v1/accounts")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success) {
+          setCreditAccounts(json.data.filter((a: CreditAccount) => a.type === "CREDIT_CARD"));
+        }
+      });
+  }, []);
 
   const totalAmount = watch("totalAmount");
   const totalMonths = watch("totalMonths");
@@ -133,6 +150,23 @@ export function DebtForm({ onSuccess, onCancel, inFamilyGroup = false, familyGro
 
         <FormRow label="หมายเหตุ">
           <Input placeholder="เช่น บัตรกรุงไทย 0% ดอกเบี้ย" className={fieldClass} {...register("notes")} />
+        </FormRow>
+
+        <FormRow label="ผ่อนผ่านบัญชี (ถ้ามี)">
+          <Select
+            value={watch("accountId") ?? "none"}
+            onValueChange={(val) => setValue("accountId", val === "none" ? null : val, { shouldValidate: true })}
+          >
+            <SelectTrigger className={fieldClass}>
+              <SelectValue placeholder="ไม่ระบุ" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">ไม่ระบุ</SelectItem>
+              {creditAccounts.map((acc) => (
+                <SelectItem key={acc.id} value={acc.id}>💳 {acc.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </FormRow>
 
         {/* Family toggle — only shown when in a family group */}

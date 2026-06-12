@@ -40,7 +40,7 @@ const ACCOUNT_TYPES = [
   { value: "BANK_ACCOUNT", label: "ธนาคาร",    emoji: "🏦" },
   { value: "SAVINGS",      label: "ออมทรัพย์",  emoji: "💰" },
   { value: "E_WALLET",     label: "E-Wallet",   emoji: "📱" },
-  { value: "CREDIT_CARD",  label: "บัตรเครดิต", emoji: "💳" },
+  { value: "CREDIT_CARD",  label: "บัตรเครดิต/สินเชื่อ", emoji: "💳" },
 ] as const;
 
 function FormRow({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
