@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { updateAccountSchema } from "@/lib/validations/account";
+import { computeAccountBalance } from "@/lib/account-balance";
 
 export async function GET(
   _req: NextRequest,
@@ -26,30 +27,11 @@ export async function GET(
       );
     }
 
-    const [income, expense, tfOut, tfIn] = await Promise.all([
-      prisma.transaction.aggregate({
-        where: { accountId: id, type: "INCOME", isTransfer: false },
-        _sum: { amount: true },
-      }),
-      prisma.transaction.aggregate({
-        where: { accountId: id, type: "EXPENSE", isTransfer: false },
-        _sum: { amount: true },
-      }),
-      prisma.transfer.aggregate({
-        where: { fromAccountId: id },
-        _sum: { amount: true },
-      }),
-      prisma.transfer.aggregate({
-        where: { toAccountId: id },
-        _sum: { amount: true },
-      }),
-    ]);
-    const balance =
-      Number(account.initialBalance) +
-      Number(income._sum.amount ?? 0) -
-      Number(expense._sum.amount ?? 0) -
-      Number(tfOut._sum.amount ?? 0) +
-      Number(tfIn._sum.amount ?? 0);
+    const balance = await computeAccountBalance(
+      id,
+      Number(account.initialBalance),
+      account.type
+    );
 
     const recentTransactions = await prisma.transaction.findMany({
       where: { accountId: id, isTransfer: false },

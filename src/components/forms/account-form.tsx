@@ -125,12 +125,16 @@ export function AccountForm({ open, onClose, onSuccess, initialAccount }: Accoun
             <Input {...register("name")} placeholder="เช่น เงินออม, UOB Preferred" className="ios-card" />
           </FormRow>
 
-          <FormRow label="ยอดเริ่มต้น (฿)" error={errors.initialBalance?.message}>
+          <FormRow
+            label={accountType === "CREDIT_CARD" ? "ยอดที่ใช้ไปแล้ว (ก่อนเริ่มจด)" : "ยอดเริ่มต้น (฿)"}
+            error={errors.initialBalance?.message}
+          >
             <Input
               {...register("initialBalance", { valueAsNumber: true })}
               type="number"
               inputMode="decimal"
               step="0.01"
+              min={accountType === "CREDIT_CARD" ? 0 : undefined}
               placeholder="0"
               className="ios-card"
             />

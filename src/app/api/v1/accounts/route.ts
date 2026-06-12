@@ -21,7 +21,8 @@ export async function GET() {
       accounts.map(async (acc) => {
         const balance = await computeAccountBalance(
           acc.id,
-          Number(acc.initialBalance)
+          Number(acc.initialBalance),
+          acc.type
         );
         return {
           id: acc.id,
