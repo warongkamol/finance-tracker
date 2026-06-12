@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
 import { ChevronLeft, ArrowLeftRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +31,13 @@ interface AccountDetail {
     date: string;
     categoryName: string | null;
     categoryIcon: string | null;
+  }[];
+  linkedDebts: {
+    id: string;
+    name: string;
+    totalMonths: number;
+    paidCount: number;
+    remainingBalance: number;
   }[];
 }
 
@@ -129,6 +137,30 @@ export default function AccountDetailPage() {
         <ArrowLeftRight className="h-4 w-4" />
         {isCreditCard ? "ชำระบัตรเครดิต/สินเชื่อ" : "โอนออก"}
       </Button>
+
+      {/* Linked debts */}
+      {isCreditCard && account.linkedDebts.length > 0 && (
+        <div>
+          <p className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">หนี้ที่ผูกกับบัญชีนี้</p>
+          <div className="ios-card divide-y divide-border/50">
+            {account.linkedDebts.map((debt) => {
+              const pct = debt.totalMonths === 0 ? 0 : Math.round((debt.paidCount / debt.totalMonths) * 100);
+              return (
+                <Link key={debt.id} href={`/debts/${debt.id}`} className="block px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[14px] font-medium">{debt.name}</p>
+                    <p className="text-[13px] font-semibold text-[#FF9500] tabular-nums">คงเหลือ {formatCurrency(debt.remainingBalance)}</p>
+                  </div>
+                  <div className="w-full bg-border/60 rounded-full h-1.5 mt-2">
+                    <div className="h-1.5 rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">ผ่อนแล้ว {debt.paidCount}/{debt.totalMonths} งวด</p>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Recent transactions */}
       <div>
