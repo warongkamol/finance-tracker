@@ -61,13 +61,14 @@ export default function AccountsPage() {
     await Promise.all(
       Object.entries(onboardBalances)
         .filter(([, v]) => v !== "" && !isNaN(parseFloat(v)))
-        .map(([id, v]) =>
-          fetch(`/api/v1/accounts/${id}`, {
+        .map(([id, v]) => {
+          const acc = accounts.find((a) => a.id === id);
+          return fetch(`/api/v1/accounts/${id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ initialBalance: parseFloat(v) }),
-          })
-        )
+            body: JSON.stringify({ initialBalance: parseFloat(v), type: acc?.type }),
+          });
+        })
     );
     localStorage.setItem("wallet_onboarded", "true");
     setOnboardOpen(false);
@@ -128,7 +129,7 @@ export default function AccountsPage() {
                   )}
                 </div>
               </div>
-              {acc.type === "CREDIT_CARD" && acc.creditLimit ? (
+              {acc.type === "CREDIT_CARD" ? (
                 <div className="text-right">
                   <p className="text-[13px] text-muted-foreground">
                     ใช้ไป{" "}
@@ -136,15 +137,19 @@ export default function AccountsPage() {
                       {formatCurrency(Math.max(0, -acc.balance))}
                     </span>
                   </p>
-                  <div className="mt-1 w-28 h-1.5 bg-secondary rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#FF3B30] rounded-full"
-                      style={{ width: `${Math.min(100, (Math.max(0, -acc.balance) / acc.creditLimit) * 100)}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    วงเงิน {formatCurrency(acc.creditLimit)}
-                  </p>
+                  {acc.creditLimit && (
+                    <>
+                      <div className="mt-1 w-28 h-1.5 bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#FF3B30] rounded-full"
+                          style={{ width: `${Math.min(100, (Math.max(0, -acc.balance) / acc.creditLimit) * 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        วงเงิน {formatCurrency(acc.creditLimit)}
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : (
                 <p className={cn("text-[17px] font-bold tabular-nums", acc.balance < 0 ? "text-[#FF3B30]" : "text-foreground")}>
@@ -174,11 +179,17 @@ export default function AccountsPage() {
             {accounts.map((acc) => (
               <div key={acc.id} className="flex items-center gap-3">
                 <span className="text-[20px]">{TYPE_EMOJI[acc.type] ?? "💰"}</span>
-                <p className="text-[14px] font-medium flex-1">{acc.name}</p>
+                <div className="flex-1">
+                  <p className="text-[14px] font-medium">{acc.name}</p>
+                  {acc.type === "CREDIT_CARD" && (
+                    <p className="text-[11px] text-muted-foreground">ยอดที่ใช้ไปแล้ว (ก่อนเริ่มจด)</p>
+                  )}
+                </div>
                 <div className="w-36">
                   <Input
                     type="number"
                     inputMode="decimal"
+                    min={acc.type === "CREDIT_CARD" ? 0 : undefined}
                     placeholder="0"
                     value={onboardBalances[acc.id] ?? ""}
                     onChange={(e) => setOnboardBalances((p) => ({ ...p, [acc.id]: e.target.value }))}

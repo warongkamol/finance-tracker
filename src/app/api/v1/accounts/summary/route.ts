@@ -53,7 +53,7 @@ export async function GET(_req: NextRequest) {
 
     const creditOutstandingResults = await Promise.all(
       creditAccounts.map(async (acc) => {
-        const balance = await computeAccountBalance(acc.id, Number(acc.initialBalance));
+        const balance = await computeAccountBalance(acc.id, Number(acc.initialBalance), acc.type);
         return Math.max(0, -balance);
       })
     );

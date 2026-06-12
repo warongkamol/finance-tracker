@@ -899,8 +899,9 @@ export default function DashboardPage() {
                 <span className="text-[13px] text-muted-foreground">💳 บัตรเครดิต</span>
                 <span className="text-[13px] font-semibold tabular-nums text-[#FF3B30]">
                   {formatCurrency(walletSummary.creditOutstanding)}
-                  {" / "}
-                  {formatCurrency(walletSummary.creditLimit)}
+                  {walletSummary.creditLimit > 0 && (
+                    <> / {formatCurrency(walletSummary.creditLimit)}</>
+                  )}
                 </span>
               </div>
             )}

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const createAccountSchema = z.object({
+const accountObjectSchema = z.object({
   name: z.string().min(1, "กรุณาใส่ชื่อ").max(50, "ชื่อยาวเกินไป"),
   type: z.enum(["CASH", "BANK_ACCOUNT", "SAVINGS", "E_WALLET", "CREDIT_CARD"]),
   initialBalance: z.number().default(0),
@@ -11,7 +11,21 @@ export const createAccountSchema = z.object({
   sortOrder: z.number().int().default(0),
 });
 
-export const updateAccountSchema = createAccountSchema.partial();
+function checkCreditCardInitialBalance(
+  data: { type?: string; initialBalance?: number },
+  ctx: z.RefinementCtx
+) {
+  if (data.type === "CREDIT_CARD" && data.initialBalance !== undefined && data.initialBalance < 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "ยอดที่ใช้ไปแล้วต้องไม่ติดลบ",
+      path: ["initialBalance"],
+    });
+  }
+}
+
+export const createAccountSchema = accountObjectSchema.superRefine(checkCreditCardInitialBalance);
+export const updateAccountSchema = accountObjectSchema.partial().superRefine(checkCreditCardInitialBalance);
 
 export const transferSchema = z
   .object({
