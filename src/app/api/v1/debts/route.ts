@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, totalAmount, totalMonths, monthlyAmount, startDate, notes, familyGroupId } = parsed.data;
+    const { name, totalAmount, totalMonths, monthlyAmount, startDate, notes, familyGroupId, accountId } = parsed.data;
     const isFamily = typeof body.isFamily === "boolean" ? body.isFamily : false;
 
     // familyGroupId controls cross-user visibility — verify membership before
@@ -88,6 +88,20 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           { success: false, error: { code: "FORBIDDEN", message: "คุณไม่ได้อยู่ในกลุ่มนี้" } },
           { status: 403 }
+        );
+      }
+    }
+
+    // accountId must reference a CREDIT_CARD/loan account owned by this user —
+    // one check covers "doesn't exist", "belongs to another user", and "wrong type"
+    if (accountId) {
+      const acc = await prisma.account.findFirst({
+        where: { id: accountId, userId: session.user.id, type: "CREDIT_CARD" },
+      });
+      if (!acc) {
+        return NextResponse.json(
+          { success: false, error: { code: "NOT_FOUND", message: "ไม่พบบัญชีบัตรเครดิต/สินเชื่อ" } },
+          { status: 404 }
         );
       }
     }
@@ -109,6 +123,7 @@ export async function POST(req: NextRequest) {
           notes: notes ?? null,
           isFamily: isFamily ?? false,
           familyGroupId: isFamily ? (familyGroupId ?? null) : null,
+          accountId: accountId ?? null,
           userId: session.user.id,
           status: "ACTIVE",
         },
