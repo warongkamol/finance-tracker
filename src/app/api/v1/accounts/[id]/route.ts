@@ -33,6 +33,29 @@ export async function GET(
       account.type
     );
 
+    const linkedDebts =
+      account.type === "CREDIT_CARD"
+        ? await prisma.debt.findMany({
+            where: { accountId: id, status: "ACTIVE" },
+            include: { payments: true },
+            orderBy: { createdAt: "desc" },
+          })
+        : [];
+
+    const enrichedLinkedDebts = linkedDebts.map((debt) => {
+      const remainingBalance = debt.payments
+        .filter((p) => p.status !== "PAID")
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+      const paidCount = debt.payments.filter((p) => p.status === "PAID").length;
+      return {
+        id: debt.id,
+        name: debt.name,
+        totalMonths: debt.totalMonths,
+        paidCount,
+        remainingBalance,
+      };
+    });
+
     const recentTransactions = await prisma.transaction.findMany({
       where: { accountId: id, isTransfer: false },
       orderBy: { date: "desc" },
@@ -64,6 +87,7 @@ export async function GET(
           categoryName: t.category?.name ?? null,
           categoryIcon: t.category?.icon ?? null,
         })),
+        linkedDebts: enrichedLinkedDebts,
       },
     });
   } catch (err) {
