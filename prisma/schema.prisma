@@ -58,6 +58,11 @@ model FamilyGroupAlias {
   @@map("family_group_aliases")
 }
 
+enum UserTier {
+  FREE
+  PRO
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -65,6 +70,7 @@ model User {
   name         String
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
+  tier         UserTier @default(FREE)
 
   familyGroups UserFamilyGroup[]
 
@@ -275,6 +281,9 @@ model Transaction {
   recurringTxnId String?               @map("recurring_txn_id")
   recurringTxn   RecurringTransaction? @relation(fields: [recurringTxnId], references: [id])
 
+  convertedToDebtId String? @map("converted_to_debt_id")
+  convertedToDebt   Debt?   @relation("DebtConvertedTransactions", fields: [convertedToDebtId], references: [id])
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -283,6 +292,7 @@ model Transaction {
   @@index([categoryId])
   @@index([familyGroupId])
   @@index([accountId])
+  @@index([convertedToDebtId])
   @@map("transactions")
 }
 
@@ -317,6 +327,7 @@ model Debt {
 
   payments    DebtPayment[]
   budgetItems BudgetItem[]
+  convertedTransactions Transaction[] @relation("DebtConvertedTransactions")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
