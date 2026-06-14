@@ -21,6 +21,12 @@ export const createDebtSchema = z.object({
   notes: z.string().max(500, "หมายเหตุยาวเกินไป").nullable().optional(),
   familyGroupId: z.string().min(1).nullable().optional(),
   accountId: z.string().min(1).nullable().optional(),
+  interestRate: z
+    .number()
+    .min(0, "อัตราดอกเบี้ยต้องไม่ติดลบ")
+    .max(99.99, "อัตราดอกเบี้ยเกินขีดจำกัด")
+    .nullable()
+    .optional(),
 });
 
 export const updateDebtSchema = createDebtSchema.partial().extend({
