@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { createDebtSchema } from "@/lib/validations/debt";
 import { DebtStatus, Prisma } from "@/generated/prisma/client";
 import { addMonths } from "@/lib/utils";
+import { createDebtPaymentsAndBudgetItems } from "@/lib/debt-helpers";
 
 export async function GET(req: NextRequest) {
   try {
@@ -130,47 +131,14 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // Auto-generate payment records
-      const payments = Array.from({ length: totalMonths }, (_, i) => ({
+      await createDebtPaymentsAndBudgetItems(tx, {
         debtId: created.id,
-        installmentNo: i + 1,
-        dueDate: addMonths(start, i),
-        amount: new Prisma.Decimal(effectiveMonthly),
-        status: "PENDING" as const,
-      }));
-
-      await tx.debtPayment.createMany({ data: payments });
-
-      // Auto-create budget LIABILITY items for each payment month
-      for (let i = 0; i < totalMonths; i++) {
-        const dueDate = addMonths(start, i);
-        const payYear = dueDate.getFullYear();
-        const payMonth = dueDate.getMonth() + 1;
-
-        const budget = await tx.budget.upsert({
-          where: { userId_year_month: { userId: session.user.id, year: payYear, month: payMonth } },
-          create: { userId: session.user.id, year: payYear, month: payMonth },
-          update: {},
-        });
-
-        // Find max sortOrder for this budget
-        const maxOrder = await tx.budgetItem.aggregate({
-          where: { budgetId: budget.id },
-          _max: { sortOrder: true },
-        });
-
-        await tx.budgetItem.create({
-          data: {
-            budgetId: budget.id,
-            debtId: created.id,
-            name: created.name,
-            type: "LIABILITY",
-            amount: new Prisma.Decimal(effectiveMonthly),
-            notes: `งวดที่ ${i + 1}/${totalMonths}`,
-            sortOrder: (maxOrder._max.sortOrder ?? 0) + 1,
-          },
-        });
-      }
+        debtName: created.name,
+        totalMonths,
+        monthlyAmount: effectiveMonthly,
+        startDate: start,
+        userId: session.user.id,
+      });
 
       return tx.debt.findUnique({
         where: { id: created.id },
