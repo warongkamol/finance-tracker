@@ -18,18 +18,28 @@ interface DebtPayment {
   transaction: { id: string } | null;
 }
 
+interface ConvertedTransaction {
+  id: string;
+  date: string;
+  description: string | null;
+  amount: string;
+  category: { id: string; name: string } | null;
+}
+
 interface Debt {
   id: string;
   name: string;
   totalAmount: string;
   monthlyAmount: string;
   totalMonths: number;
+  interestRate: string | null;
   startDate: string;
   endDate: string;
   notes: string | null;
   status: "ACTIVE" | "COMPLETED" | "CANCELLED";
   account: { id: string; name: string } | null;
   payments: DebtPayment[];
+  convertedTransactions: ConvertedTransaction[];
   paidCount: number;
   remainingBalance: number;
 }
@@ -43,6 +53,8 @@ export default function DebtDetailPage() {
   const [confirmPay, setConfirmPay] = useState<DebtPayment | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [unconvertDialogOpen, setUnconvertDialogOpen] = useState(false);
+  const [unconvertLoading, setUnconvertLoading] = useState(false);
 
   const fetchDebt = useCallback(async () => {
     setLoading(true);
@@ -79,6 +91,20 @@ export default function DebtDetailPage() {
       if ((await res.json()).success) router.push("/debts");
     } finally {
       setDeleteLoading(false);
+    }
+  }
+
+  async function handleUnconvert() {
+    setUnconvertLoading(true);
+    try {
+      const res = await fetch(`/api/v1/debts/${id}/unconvert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if ((await res.json()).success) router.push("/debts");
+    } finally {
+      setUnconvertLoading(false);
     }
   }
 
@@ -167,6 +193,10 @@ export default function DebtDetailPage() {
           <p className="text-[13px] text-muted-foreground">{debt.notes}</p>
         )}
 
+        {debt.interestRate && Number(debt.interestRate) > 0 && (
+          <p className="text-[13px] text-muted-foreground">ดอกเบี้ย {Number(debt.interestRate)}% ต่อเดือน</p>
+        )}
+
         {debt.account && (
           <Link
             href={`/accounts/${debt.account.id}`}
@@ -232,6 +262,32 @@ export default function DebtDetailPage() {
         </div>
       </div>
 
+      {/* Converted-from transactions */}
+      {debt.convertedTransactions.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide px-1">แปลงมาจากรายการ</p>
+          <div className="ios-card overflow-hidden divide-y divide-border">
+            {debt.convertedTransactions.map((t) => (
+              <div key={t.id} className="flex items-center gap-3 px-4 py-3.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[14px] font-medium truncate">{t.category?.name ?? "อื่นๆ"}</p>
+                  <p className="text-[12px] text-muted-foreground truncate">
+                    {formatShortDate(t.date)}{t.description ? ` · ${t.description}` : ""}
+                  </p>
+                </div>
+                <p className="text-[14px] font-semibold tabular-nums shrink-0">{formatCurrency(Number(t.amount))}</p>
+              </div>
+            ))}
+          </div>
+
+          {debt.paidCount === 0 && (
+            <Button variant="secondary" className="w-full" onClick={() => setUnconvertDialogOpen(true)}>
+              ยกเลิกการแปลง
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Confirm pay */}
       <Dialog open={!!confirmPay} onOpenChange={(open) => { if (!open) setConfirmPay(null); }}>
         <DialogContent>
@@ -266,6 +322,24 @@ export default function DebtDetailPage() {
             <Button variant="secondary" onClick={() => setDeleteDialogOpen(false)} disabled={deleteLoading}>ยกเลิก</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleteLoading}>
               {deleteLoading ? "กำลังดำเนินการ..." : "ยืนยัน"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unconvert dialog */}
+      <Dialog open={unconvertDialogOpen} onOpenChange={setUnconvertDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ยกเลิกการแปลงเป็นยอดผ่อน</DialogTitle>
+            <DialogDescription>
+              รายการเดิมจะกลับมานับในยอดรวมตามปกติ และรายการผ่อนนี้จะถูกลบทั้งหมด ยืนยันหรือไม่?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2">
+            <Button variant="secondary" onClick={() => setUnconvertDialogOpen(false)} disabled={unconvertLoading}>ยกเลิก</Button>
+            <Button variant="destructive" onClick={handleUnconvert} disabled={unconvertLoading}>
+              {unconvertLoading ? "กำลังดำเนินการ..." : "ยืนยัน"}
             </Button>
           </DialogFooter>
         </DialogContent>
