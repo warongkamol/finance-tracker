@@ -52,6 +52,8 @@ export function DebtForm({ onSuccess, onCancel, inFamilyGroup = false, familyGro
   const [isFamily, setIsFamily] = useState(false);
   const [familyGroupId, setFamilyGroupId] = useState<string | null>(null);
   const [creditAccounts, setCreditAccounts] = useState<CreditAccount[]>([]);
+  const [interestValue, setInterestValue] = useState("0");
+  const [interestUnit, setInterestUnit] = useState<"month" | "year">("month");
 
   const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<CreateDebtInput>({
     resolver: zodResolver(createDebtSchema),
@@ -77,9 +79,12 @@ export function DebtForm({ onSuccess, onCancel, inFamilyGroup = false, familyGro
   async function onSubmit(data: CreateDebtInput) {
     setServerError("");
     try {
+      const rateValueNum = parseFloat(interestValue) || 0;
+      const monthlyRate = interestUnit === "year" ? rateValueNum / 12 : rateValueNum;
       const payload = {
         ...data,
         monthlyAmount: useCustomMonthly ? data.monthlyAmount : null,
+        interestRate: monthlyRate > 0 ? monthlyRate : null,
         isFamily,
         familyGroupId: isFamily ? familyGroupId : null,
       };
@@ -167,6 +172,37 @@ export function DebtForm({ onSuccess, onCancel, inFamilyGroup = false, familyGro
               ))}
             </SelectContent>
           </Select>
+        </FormRow>
+
+        <FormRow label="อัตราดอกเบี้ย (ไม่บังคับ)">
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              placeholder="0"
+              className={cn(fieldClass, "flex-1")}
+              value={interestValue}
+              onChange={(e) => setInterestValue(e.target.value)}
+            />
+            <div className="ios-card p-1 grid grid-cols-2 gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setInterestUnit("month")}
+                className={cn("px-3 h-9 rounded-lg text-[13px] font-medium", interestUnit === "month" ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
+              >
+                ต่อเดือน
+              </button>
+              <button
+                type="button"
+                onClick={() => setInterestUnit("year")}
+                className={cn("px-3 h-9 rounded-lg text-[13px] font-medium", interestUnit === "year" ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
+              >
+                ต่อปี
+              </button>
+            </div>
+          </div>
         </FormRow>
 
         {/* Family toggle — only shown when in a family group */}
