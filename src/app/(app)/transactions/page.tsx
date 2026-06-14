@@ -42,6 +42,8 @@ interface Transaction {
   isFamily: boolean;
   familyMember: { id: string; name: string } | null;
   user: { id: string; name: string };
+  isTransfer: boolean;
+  convertedToDebtId: string | null;
 }
 
 interface Summary {
@@ -396,12 +398,22 @@ export default function TransactionsPage() {
                     </div>
 
                     {/* Amount */}
-                    <p className={cn(
-                      "text-[15px] font-semibold tabular-nums shrink-0",
-                      tx.type === "INCOME" ? "text-[#34C759]" : "text-foreground"
-                    )}>
-                      {tx.type === "INCOME" ? "+" : "−"}{formatCurrency(parseFloat(tx.amount))}
-                    </p>
+                    <div className="flex flex-col items-end gap-0.5 shrink-0">
+                      <p className={cn(
+                        "text-[15px] font-semibold tabular-nums",
+                        tx.type === "INCOME" ? "text-[#34C759]" : "text-foreground"
+                      )}>
+                        {tx.type === "INCOME" ? "+" : "−"}{formatCurrency(parseFloat(tx.amount))}
+                      </p>
+                      {tx.convertedToDebtId && (
+                        <Link
+                          href={`/debts/${tx.convertedToDebtId}`}
+                          className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
+                        >
+                          ผ่อนแล้ว
+                        </Link>
+                      )}
+                    </div>
 
                     {/* Actions */}
                     <div className="flex gap-0.5 shrink-0">
