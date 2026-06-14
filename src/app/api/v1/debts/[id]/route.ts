@@ -25,6 +25,16 @@ export async function GET(
           include: { transaction: { select: { id: true } } },
           orderBy: { installmentNo: "asc" },
         },
+        convertedTransactions: {
+          select: {
+            id: true,
+            date: true,
+            description: true,
+            amount: true,
+            category: { select: { id: true, name: true } },
+          },
+          orderBy: { date: "asc" },
+        },
       },
     });
 
