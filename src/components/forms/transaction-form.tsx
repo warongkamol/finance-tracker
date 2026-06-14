@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectSeparator } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Loader2, Users } from "lucide-react";
+import { Loader2, Users, CreditCard } from "lucide-react";
+import Link from "next/link";
+import { ConvertToInstallmentDialog } from "@/components/forms/convert-to-installment-dialog";
 
 interface Category {
   id: string;
@@ -63,6 +65,8 @@ interface TransactionFormProps {
     familyMemberId?: string | null;
     familyMember?: { id: string; name: string } | null;
     familyGroupId?: string | null;
+    isTransfer?: boolean;
+    convertedToDebtId?: string | null;
   };
   prefill?: PrefillValues;
   onSuccess: () => void;
@@ -88,6 +92,15 @@ function FormRow({ label, error, children }: { label: string; error?: string; ch
   );
 }
 
+function findCategoryName(categories: Category[], categoryId: string): string | null {
+  for (const cat of categories) {
+    if (cat.id === categoryId) return cat.name;
+    const child = cat.children.find((c) => c.id === categoryId);
+    if (child) return child.name;
+  }
+  return null;
+}
+
 export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }: TransactionFormProps) {
   const isEdit = !!defaultValues;
   const [txType, setTxType] = useState<"INCOME" | "EXPENSE">(defaultValues?.type ?? prefill?.type ?? "EXPENSE");
@@ -100,6 +113,8 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
   const [familyGroupId, setFamilyGroupId] = useState<string | null>(defaultValues?.familyGroupId ?? null);
   const [loadingData, setLoadingData] = useState(true);
   const [serverError, setServerError] = useState("");
+  const [tier, setTier] = useState<"FREE" | "PRO">("FREE");
+  const [convertOpen, setConvertOpen] = useState(false);
 
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<CreateTransactionInput>({
     resolver: zodResolver(createTransactionSchema),
@@ -119,16 +134,18 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
   useEffect(() => {
     async function loadData() {
       try {
-        const [catRes, accRes, fmRes, fgRes] = await Promise.all([
+        const [catRes, accRes, fmRes, fgRes, meRes] = await Promise.all([
           fetch("/api/v1/categories"),
           fetch("/api/v1/accounts"),
           fetch("/api/v1/family-members"),
           fetch("/api/v1/family"),
+          fetch("/api/v1/auth/me"),
         ]);
         const catData = await catRes.json();
         const accData = await accRes.json();
         const fmData = await fmRes.json();
         const fgData = await fgRes.json();
+        const meData = await meRes.json();
         if (catData.success) setCategories(catData.data);
         if (accData.success) {
           setAccounts(accData.data);
@@ -139,6 +156,7 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
         }
         if (fmData.success) setFamilyMembers(fmData.data);
         if (fgData.success) setFamilyGroups(fgData.data.groups);
+        if (meData.success) setTier(meData.data.tier);
       } finally {
         setLoadingData(false);
       }
@@ -147,6 +165,14 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
   }, []);
 
   const filteredCategories = categories.filter((c) => c.type === txType);
+
+  const editingAccount = accounts.find((a) => a.id === defaultValues?.accountId);
+  const canConvert =
+    isEdit &&
+    defaultValues?.type === "EXPENSE" &&
+    defaultValues?.isTransfer === false &&
+    !defaultValues?.convertedToDebtId &&
+    editingAccount?.type === "CREDIT_CARD";
 
   function handleTypeChange(type: "INCOME" | "EXPENSE") {
     setTxType(type);
@@ -185,6 +211,7 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
   }
 
   return (
+    <>
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       {/* Type toggle — iOS segmented control */}
       <div className="ios-card p-1 grid grid-cols-2 gap-1">
@@ -346,6 +373,26 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
         )}
       </div>
 
+      {canConvert && (
+        <button
+          type="button"
+          onClick={() => setConvertOpen(true)}
+          className="ios-card w-full flex items-center justify-center gap-2 px-5 py-3 text-[14px] font-medium text-primary"
+        >
+          <CreditCard className="h-4 w-4" />
+          แบ่งชำระรายเดือน
+        </button>
+      )}
+
+      {isEdit && defaultValues?.convertedToDebtId && (
+        <div className="ios-card px-5 py-4 space-y-1">
+          <p className="text-[13px] text-muted-foreground">รายการนี้ถูกแปลงเป็นยอดผ่อนแล้ว</p>
+          <Link href={`/debts/${defaultValues.convertedToDebtId}`} className="text-[14px] font-medium text-primary">
+            ดูรายการหนี้ →
+          </Link>
+        </div>
+      )}
+
       {serverError && <p className="text-[14px] text-destructive text-center">{serverError}</p>}
 
       <div className="flex gap-3">
@@ -356,5 +403,23 @@ export function TransactionForm({ defaultValues, prefill, onSuccess, onCancel }:
         </Button>
       </div>
     </form>
+
+    {canConvert && defaultValues && (
+      <ConvertToInstallmentDialog
+        open={convertOpen}
+        onOpenChange={setConvertOpen}
+        transaction={{
+          id: defaultValues.id,
+          date: defaultValues.date,
+          description: defaultValues.description,
+          amount: parseFloat(defaultValues.amount),
+          accountId: defaultValues.accountId ?? "",
+          categoryName: findCategoryName(categories, defaultValues.categoryId) ?? "อื่นๆ",
+        }}
+        tier={tier}
+        onConverted={() => { setConvertOpen(false); onSuccess(); }}
+      />
+    )}
+    </>
   );
 }
