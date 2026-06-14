@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       include: { items: { include: { category: true }, orderBy: [{ type: "asc" }, { sortOrder: "asc" }] } },
     }),
     prisma.transaction.findMany({
-      where: { userId: session.user.id, date: { gte: startDate, lte: endDate }, isTransfer: false },
+      where: { userId: session.user.id, date: { gte: startDate, lte: endDate }, isTransfer: false, convertedToDebtId: null },
       include: { category: true },
     }),
   ]);

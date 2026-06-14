@@ -23,7 +23,7 @@ interface CategoryData extends CategoryChildData {
 async function aggregateByCategory(where: Prisma.TransactionWhereInput): Promise<CategoryData[]> {
   const grouped = await prisma.transaction.groupBy({
     by: ["categoryId"],
-    where: { ...where, categoryId: { not: null } },
+    where: { ...where, categoryId: { not: null }, convertedToDebtId: null },
     _sum: { amount: true },
   });
   if (grouped.length === 0) return [];

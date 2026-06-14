@@ -22,11 +22,11 @@ export async function GET(_req: NextRequest) {
       liquidAccounts.map(async (acc) => {
         const [income, expense, tfOut, tfIn] = await Promise.all([
           prisma.transaction.aggregate({
-            where: { accountId: acc.id, type: "INCOME", isTransfer: false },
+            where: { accountId: acc.id, type: "INCOME", isTransfer: false, convertedToDebtId: null },
             _sum: { amount: true },
           }),
           prisma.transaction.aggregate({
-            where: { accountId: acc.id, type: "EXPENSE", isTransfer: false },
+            where: { accountId: acc.id, type: "EXPENSE", isTransfer: false, convertedToDebtId: null },
             _sum: { amount: true },
           }),
           prisma.transfer.aggregate({

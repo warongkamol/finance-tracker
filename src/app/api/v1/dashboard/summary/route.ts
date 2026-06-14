@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     // "family" now scopes by an explicit, authorized familyGroupId — never a
     // merge across the user's groups. With no group selected, fall back to
     // the pre-multi-group behavior: just the caller's own family-tagged rows.
-    let baseWhere: { userId?: string | { in: string[] }; isFamily?: boolean; familyGroupId?: string; date: { gte: Date; lt: Date }; isTransfer: boolean };
+    let baseWhere: { userId?: string | { in: string[] }; isFamily?: boolean; familyGroupId?: string; date: { gte: Date; lt: Date }; isTransfer: boolean; convertedToDebtId: null };
     if (familyFilter === "family") {
       const familyGroupIdParam = searchParams.get("familyGroupId");
       if (familyGroupIdParam) {
@@ -42,14 +42,14 @@ export async function GET(req: NextRequest) {
             { status: 403 }
           );
         }
-        baseWhere = { familyGroupId: familyGroupIdParam, date: { gte: startDate, lt: endDate }, isTransfer: false };
+        baseWhere = { familyGroupId: familyGroupIdParam, date: { gte: startDate, lt: endDate }, isTransfer: false, convertedToDebtId: null };
       } else {
-        baseWhere = { userId: session.user.id, isFamily: true, date: { gte: startDate, lt: endDate }, isTransfer: false };
+        baseWhere = { userId: session.user.id, isFamily: true, date: { gte: startDate, lt: endDate }, isTransfer: false, convertedToDebtId: null };
       }
     } else {
       // "mine" now reflects everything the user paid for (personal + family-tagged) — the
       // same underlying scope as "all" — the UI additionally shows a personal/family split.
-      baseWhere = { userId: session.user.id, date: { gte: startDate, lt: endDate }, isTransfer: false };
+      baseWhere = { userId: session.user.id, date: { gte: startDate, lt: endDate }, isTransfer: false, convertedToDebtId: null };
     }
 
     const [txGroups, splitGroups, personalDebts, familyDebts, overdueCount] = await Promise.all([
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
       familyFilter === "mine"
         ? prisma.transaction.groupBy({
             by: ["isFamily", "type"],
-            where: { userId: session.user.id, date: { gte: startDate, lt: endDate }, isTransfer: false },
+            where: { userId: session.user.id, date: { gte: startDate, lt: endDate }, isTransfer: false, convertedToDebtId: null },
             _sum: { amount: true },
           })
         : Promise.resolve(null),

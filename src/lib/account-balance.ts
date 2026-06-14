@@ -7,11 +7,11 @@ export async function computeAccountBalance(
 ): Promise<number> {
   const [income, expense, tfOut, tfIn] = await Promise.all([
     prisma.transaction.aggregate({
-      where: { accountId, type: "INCOME", isTransfer: false },
+      where: { accountId, type: "INCOME", isTransfer: false, convertedToDebtId: null },
       _sum: { amount: true },
     }),
     prisma.transaction.aggregate({
-      where: { accountId, type: "EXPENSE", isTransfer: false },
+      where: { accountId, type: "EXPENSE", isTransfer: false, convertedToDebtId: null },
       _sum: { amount: true },
     }),
     prisma.transfer.aggregate({

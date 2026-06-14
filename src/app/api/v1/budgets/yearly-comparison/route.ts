@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
         include: { items: { select: { type: true, amount: true } } },
       }),
       prisma.transaction.findMany({
-        where: { userId: session.user.id, date: { gte: startDate, lt: endDate }, isTransfer: false },
+        where: { userId: session.user.id, date: { gte: startDate, lt: endDate }, isTransfer: false, convertedToDebtId: null },
         select: { type: true, amount: true, date: true },
       }),
     ]);

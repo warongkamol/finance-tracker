@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
       userId: session.user.id,
       date: { gte: startDate, lt: endDate },
       isTransfer: false,
+      convertedToDebtId: null,
     };
 
     const [incomeResult, expenseResult] = await prisma.$transaction([
