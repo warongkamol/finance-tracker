@@ -29,3 +29,16 @@ export const updateDebtSchema = createDebtSchema.partial().extend({
 
 export type CreateDebtInput = z.infer<typeof createDebtSchema>;
 export type UpdateDebtInput = z.infer<typeof updateDebtSchema>;
+
+export const convertToDebtSchema = z.object({
+  transactionIds: z.array(z.string().min(1)).min(1, "กรุณาเลือกรายการ"),
+  totalMonths: z
+    .number()
+    .int("จำนวนงวดต้องเป็นจำนวนเต็ม")
+    .min(1, "จำนวนงวดต้องมากกว่า 0")
+    .max(360, "จำนวนงวดเกินขีดจำกัด"),
+  interestRate: z.number().min(0).max(99.99).nullable().optional(),
+  name: z.string().min(1, "กรุณาใส่ชื่อรายการ").max(100, "ชื่อยาวเกินไป"),
+});
+
+export type ConvertToDebtInput = z.infer<typeof convertToDebtSchema>;
