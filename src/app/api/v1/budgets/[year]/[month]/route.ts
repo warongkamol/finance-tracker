@@ -5,6 +5,18 @@ import { upsertBudgetSchema } from "@/lib/validations/budget";
 
 type Params = { params: Promise<{ year: string; month: string }> };
 
+// Prisma returns BudgetItem.amount as a Decimal — JSON.stringify serializes it
+// to a string (no guaranteed decimal point for whole numbers), and the client
+// sums items with `+` expecting a number. Convert here so the wire contract
+// matches the client's `amount: number` type.
+function serializeBudget<T extends { items: { amount: unknown }[] } | null>(budget: T): T {
+  if (!budget) return budget;
+  return {
+    ...budget,
+    items: budget.items.map(item => ({ ...item, amount: Number(item.amount) })),
+  };
+}
+
 // GET /api/v1/budgets/:year/:month
 export async function GET(_: NextRequest, { params }: Params) {
   const session = await auth();
@@ -23,7 +35,7 @@ export async function GET(_: NextRequest, { params }: Params) {
     },
   });
 
-  return NextResponse.json({ success: true, data: budget ?? { year: y, month: m, items: [] } });
+  return NextResponse.json({ success: true, data: budget ? serializeBudget(budget) : { year: y, month: m, items: [] } });
 }
 
 // PUT /api/v1/budgets/:year/:month — upsert all items for the month
@@ -70,5 +82,5 @@ export async function PUT(req: NextRequest, { params }: Params) {
     include: { items: { include: { category: true }, orderBy: [{ type: "asc" }, { sortOrder: "asc" }] } },
   });
 
-  return NextResponse.json({ success: true, data: result });
+  return NextResponse.json({ success: true, data: serializeBudget(result) });
 }

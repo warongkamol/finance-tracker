@@ -49,3 +49,6 @@ next-env.d.ts
 
 /src/generated/prisma
 .claude/scheduled_tasks.lock
+
+# superpowers brainstorming visual-companion mockups
+.superpowers/

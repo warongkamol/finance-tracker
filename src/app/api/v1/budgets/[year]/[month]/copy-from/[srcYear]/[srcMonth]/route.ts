@@ -46,5 +46,11 @@ export async function POST(_: NextRequest, { params }: Params) {
     include: { items: { include: { category: true }, orderBy: [{ type: "asc" }, { sortOrder: "asc" }] } },
   });
 
-  return NextResponse.json({ success: true, data: result });
+  // Prisma Decimal serializes via JSON.stringify without a guaranteed decimal
+  // point — convert to a real number so the client's `+` sums don't silently
+  // string-concatenate (see [[debug_known_issues]]).
+  return NextResponse.json({
+    success: true,
+    data: result && { ...result, items: result.items.map(item => ({ ...item, amount: Number(item.amount) })) },
+  });
 }
