@@ -101,6 +101,50 @@ export async function GET(req: NextRequest) {
   const actualLiability = items.filter(i => i.type === "LIABILITY").reduce((s, i) => s + i.actual, 0) + actualLiabilityTransferOutflow;
   const actualSaving = items.filter(i => i.type === "SAVING").reduce((s, i) => s + i.actual, 0) + actualSavingTransferOutflow;
 
+  // --- Unmatched-category detection ---
+  // A budget item with no categoryId is a catch-all that already absorbs
+  // every transaction of its type into its own "actual" figure above — once
+  // that catch-all exists, nothing of that type can be "outside the plan".
+  const incomeItems = (budget?.items ?? []).filter(i => i.type === "INCOME");
+  const expenseItems = (budget?.items ?? []).filter(i => i.type === "EXPENSE");
+  const hasIncomeCatchAll = incomeItems.some(i => !i.categoryId);
+  const hasExpenseCatchAll = expenseItems.some(i => !i.categoryId);
+
+  const isCategoryMatched = (t: (typeof nonDebtTransactions)[number], typeItems: typeof incomeItems) =>
+    typeItems.some(item => {
+      if (!item.categoryId) return true;
+      const isRoot = item.category?.parentId == null;
+      return matchesCategory(t, item.categoryId, isRoot);
+    });
+
+  type UnmatchedRow = { categoryId: string | null; categoryName: string; categoryIcon: string | null; total: number };
+  const aggregateByCategory = (txs: typeof nonDebtTransactions): UnmatchedRow[] => {
+    const map = new Map<string, UnmatchedRow>();
+    for (const t of txs) {
+      const key = t.categoryId ?? "uncategorized";
+      const amount = Number(t.amount);
+      const existing = map.get(key);
+      if (existing) {
+        existing.total += amount;
+      } else {
+        map.set(key, {
+          categoryId: t.categoryId ?? null,
+          categoryName: t.category?.name ?? "ไม่ระบุหมวดหมู่",
+          categoryIcon: t.category?.icon ?? null,
+          total: amount,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  };
+
+  const unmatchedIncome = hasIncomeCatchAll
+    ? []
+    : aggregateByCategory(nonDebtTransactions.filter(t => t.type === "INCOME" && !isCategoryMatched(t, incomeItems)));
+  const unmatchedExpense = hasExpenseCatchAll
+    ? []
+    : aggregateByCategory(nonDebtTransactions.filter(t => t.type === "EXPENSE" && !isCategoryMatched(t, expenseItems)));
+
   return NextResponse.json({
     success: true,
     data: {
@@ -113,6 +157,10 @@ export async function GET(req: NextRequest) {
         actualNet: actualIncome - actualExpense - actualLiability - actualSaving,
       },
       items,
+      unmatched: {
+        income: unmatchedIncome,
+        expense: unmatchedExpense,
+      },
     },
   });
 }
