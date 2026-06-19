@@ -27,14 +27,34 @@ export const createDebtSchema = z.object({
     .max(99.99, "อัตราดอกเบี้ยเกินขีดจำกัด")
     .nullable()
     .optional(),
+  status: z.literal("PLANNED").optional(),
 });
 
-export const updateDebtSchema = createDebtSchema.partial().extend({
-  status: z.enum(["ACTIVE", "COMPLETED", "CANCELLED"]).optional(),
-});
+export const updateDebtSchema = createDebtSchema
+  .omit({ status: true })
+  .partial()
+  .extend({
+    status: z.enum(["ACTIVE", "COMPLETED", "CANCELLED"]).optional(),
+  });
 
 export type CreateDebtInput = z.infer<typeof createDebtSchema>;
 export type UpdateDebtInput = z.infer<typeof updateDebtSchema>;
+
+export const confirmPlannedDebtSchema = z.object({
+  totalAmount: z
+    .number()
+    .positive("จำนวนเงินต้องมากกว่า 0")
+    .max(999999999.99, "จำนวนเงินเกินขีดจำกัด")
+    .optional(),
+  totalMonths: z
+    .number()
+    .int("จำนวนงวดต้องเป็นจำนวนเต็ม")
+    .min(1, "จำนวนงวดต้องมากกว่า 0")
+    .max(360, "จำนวนงวดเกินขีดจำกัด")
+    .optional(),
+});
+
+export type ConfirmPlannedDebtInput = z.infer<typeof confirmPlannedDebtSchema>;
 
 export const convertToDebtSchema = z.object({
   transactionIds: z.array(z.string().min(1)).min(1, "กรุณาเลือกรายการ"),
