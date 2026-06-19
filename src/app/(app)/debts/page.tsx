@@ -26,7 +26,7 @@ interface Debt {
   startDate: string;
   endDate: string;
   notes: string | null;
-  status: "ACTIVE" | "COMPLETED" | "CANCELLED";
+  status: "ACTIVE" | "PLANNED" | "COMPLETED" | "CANCELLED";
   payments: DebtPaymentSummary[];
   remainingBalance: number;
   paidCount: number;
@@ -39,7 +39,7 @@ interface FamilyGroup {
   displayName: string;
 }
 
-type TabType = "ACTIVE" | "COMPLETED" | "CANCELLED";
+type TabType = "ACTIVE" | "PLANNED" | "COMPLETED" | "CANCELLED";
 
 function Skeleton({ className }: { className?: string }) {
   return <div className={cn("animate-pulse rounded-2xl bg-border/50", className)} />;
@@ -123,8 +123,8 @@ export default function DebtsPage() {
       )}
 
       {/* Tabs */}
-      <div className="ios-card p-1 grid grid-cols-3 gap-1">
-        {(["ACTIVE", "COMPLETED", "CANCELLED"] as TabType[]).map((t) => (
+      <div className="ios-card p-1 grid grid-cols-4 gap-1">
+        {(["ACTIVE", "PLANNED", "COMPLETED", "CANCELLED"] as TabType[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -133,7 +133,7 @@ export default function DebtsPage() {
               tab === t ? "bg-primary text-white shadow-sm" : "text-muted-foreground"
             )}
           >
-            {t === "ACTIVE" ? "กำลังผ่อน" : t === "COMPLETED" ? "ชำระครบ" : "ยกเลิก"}
+            {t === "ACTIVE" ? "กำลังผ่อน" : t === "PLANNED" ? "วางแผน" : t === "COMPLETED" ? "ชำระครบ" : "ยกเลิก"}
           </button>
         ))}
       </div>
@@ -145,7 +145,8 @@ export default function DebtsPage() {
         <div className="text-center py-20">
           <p className="text-4xl mb-3">💳</p>
           <p className="text-[16px] font-medium">
-            {tab === "ACTIVE" ? "ยังไม่มีรายการผ่อนชำระ" : "ไม่มีรายการในหมวดนี้"}
+            {tab === "ACTIVE" ? "ยังไม่มีรายการผ่อนชำระ" :
+             tab === "PLANNED" ? "ไม่มีแผนการเงินที่รอยืนยัน" : "ไม่มีรายการในหมวดนี้"}
           </p>
           {tab === "ACTIVE" && <p className="text-[14px] text-muted-foreground mt-1">กด + เพื่อเพิ่มรายการผ่อน</p>}
         </div>
