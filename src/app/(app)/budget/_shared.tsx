@@ -73,14 +73,22 @@ export interface ComparisonItem {
   category: { id: string; name: string; icon: string | null } | null;
 }
 
+export interface UnmatchedCategoryRow {
+  categoryId: string | null;
+  categoryName: string;
+  categoryIcon: string | null;
+  total: number;
+}
+
 export interface Comparison {
   hasBudget: boolean;
   summary: {
     plannedIncome: number; plannedExpense: number; plannedLiability: number; plannedSaving: number;
-    actualIncome: number; actualExpense: number;
+    actualIncome: number; actualExpense: number; actualLiability: number; actualSaving: number;
     plannedNet: number; actualNet: number;
   };
   items: ComparisonItem[];
+  unmatched: { income: UnmatchedCategoryRow[]; expense: UnmatchedCategoryRow[] };
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
