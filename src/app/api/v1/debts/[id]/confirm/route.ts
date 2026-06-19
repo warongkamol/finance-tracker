@@ -53,6 +53,17 @@ export async function POST(
     const endDate = addMonths(startDate, totalMonths - 1);
 
     const debt = await prisma.$transaction(async (tx) => {
+      // Conditional update guards against a concurrent double-submit: only
+      // one transaction can flip status PLANNED -> ACTIVE, so a racing
+      // second request sees count 0 and aborts before touching payments.
+      const { count } = await tx.debt.updateMany({
+        where: { id, status: "PLANNED" },
+        data: { totalAmount, totalMonths, monthlyAmount, endDate, status: "ACTIVE" },
+      });
+      if (count === 0) {
+        throw new Error("NOT_PLANNED");
+      }
+
       // PLANNED creation already made budget-item lines for the ORIGINAL
       // totalMonths span. totalAmount/totalMonths may have just changed (the
       // original entry was an estimate), so wipe them and let
@@ -60,10 +71,7 @@ export async function POST(
       // simpler and less error-prone than diffing old vs new month spans.
       await tx.budgetItem.deleteMany({ where: { debtId: id } });
 
-      const updated = await tx.debt.update({
-        where: { id },
-        data: { totalAmount, totalMonths, monthlyAmount, endDate, status: "ACTIVE" },
-      });
+      const updated = await tx.debt.findUniqueOrThrow({ where: { id } });
 
       await createDebtPaymentsAndBudgetItems(tx, {
         debtId: id,
@@ -84,7 +92,14 @@ export async function POST(
     });
 
     return NextResponse.json({ success: true, data: debt });
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.message === "NOT_PLANNED") {
+      return NextResponse.json(
+        { success: false, error: { code: "NOT_PLANNED", message: "รายการนี้ไม่ใช่แผนการเงินที่รอยืนยัน" } },
+        { status: 400 }
+      );
+    }
+    console.error("POST /api/v1/debts/[id]/confirm failed:", err);
     return NextResponse.json(
       { success: false, error: { code: "INTERNAL_ERROR", message: "เกิดข้อผิดพลาด กรุณาลองใหม่" } },
       { status: 500 }
