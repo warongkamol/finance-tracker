@@ -302,6 +302,7 @@ model Transaction {
 
 enum DebtStatus {
   ACTIVE
+  PLANNED
   COMPLETED
   CANCELLED
 }

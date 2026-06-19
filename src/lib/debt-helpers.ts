@@ -1,7 +1,29 @@
 import { Prisma } from "@/generated/prisma/client";
 import { addMonths } from "@/lib/utils";
 
-export async function createDebtPaymentsAndBudgetItems(
+export async function createDebtPayments(
+  tx: Prisma.TransactionClient,
+  params: {
+    debtId: string;
+    totalMonths: number;
+    monthlyAmount: number;
+    startDate: Date;
+  }
+) {
+  const { debtId, totalMonths, monthlyAmount, startDate } = params;
+
+  const payments = Array.from({ length: totalMonths }, (_, i) => ({
+    debtId,
+    installmentNo: i + 1,
+    dueDate: addMonths(startDate, i),
+    amount: new Prisma.Decimal(monthlyAmount),
+    status: "PENDING" as const,
+  }));
+
+  await tx.debtPayment.createMany({ data: payments });
+}
+
+export async function createBudgetItemsForDebt(
   tx: Prisma.TransactionClient,
   params: {
     debtId: string;
@@ -13,16 +35,6 @@ export async function createDebtPaymentsAndBudgetItems(
   }
 ) {
   const { debtId, debtName, totalMonths, monthlyAmount, startDate, userId } = params;
-
-  const payments = Array.from({ length: totalMonths }, (_, i) => ({
-    debtId,
-    installmentNo: i + 1,
-    dueDate: addMonths(startDate, i),
-    amount: new Prisma.Decimal(monthlyAmount),
-    status: "PENDING" as const,
-  }));
-
-  await tx.debtPayment.createMany({ data: payments });
 
   for (let i = 0; i < totalMonths; i++) {
     const dueDate = addMonths(startDate, i);
@@ -52,4 +64,19 @@ export async function createDebtPaymentsAndBudgetItems(
       },
     });
   }
+}
+
+export async function createDebtPaymentsAndBudgetItems(
+  tx: Prisma.TransactionClient,
+  params: {
+    debtId: string;
+    debtName: string;
+    totalMonths: number;
+    monthlyAmount: number;
+    startDate: Date;
+    userId: string;
+  }
+) {
+  await createDebtPayments(tx, params);
+  await createBudgetItemsForDebt(tx, params);
 }
