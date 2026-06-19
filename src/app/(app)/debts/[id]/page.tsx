@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock, AlertCircle, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { formatCurrency, formatDate, formatShortDate, cn } from "@/lib/utils";
 
 interface DebtPayment {
@@ -36,7 +37,7 @@ interface Debt {
   startDate: string;
   endDate: string;
   notes: string | null;
-  status: "ACTIVE" | "COMPLETED" | "CANCELLED";
+  status: "ACTIVE" | "PLANNED" | "COMPLETED" | "CANCELLED";
   account: { id: string; name: string } | null;
   payments: DebtPayment[];
   convertedTransactions: ConvertedTransaction[];
@@ -55,6 +56,11 @@ export default function DebtDetailPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [unconvertDialogOpen, setUnconvertDialogOpen] = useState(false);
   const [unconvertLoading, setUnconvertLoading] = useState(false);
+  const [confirmPlanOpen, setConfirmPlanOpen] = useState(false);
+  const [confirmAmount, setConfirmAmount] = useState("");
+  const [confirmMonths, setConfirmMonths] = useState("");
+  const [confirmError, setConfirmError] = useState("");
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   const fetchDebt = useCallback(async () => {
     setLoading(true);
@@ -108,6 +114,40 @@ export default function DebtDetailPage() {
     }
   }
 
+  function openConfirmPlan() {
+    if (!debt) return;
+    setConfirmAmount(String(Number(debt.totalAmount)));
+    setConfirmMonths(String(debt.totalMonths));
+    setConfirmError("");
+    setConfirmPlanOpen(true);
+  }
+
+  async function handleConfirmPlanned() {
+    const amt = parseFloat(confirmAmount);
+    const months = parseInt(confirmMonths, 10);
+    if (isNaN(amt) || amt <= 0) { setConfirmError("จำนวนเงินต้องมากกว่า 0"); return; }
+    if (isNaN(months) || months < 1 || months > 360) { setConfirmError("จำนวนงวดต้อง 1-360 เดือน"); return; }
+
+    setConfirmLoading(true);
+    setConfirmError("");
+    try {
+      const res = await fetch(`/api/v1/debts/${id}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ totalAmount: amt, totalMonths: months }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConfirmPlanOpen(false);
+        await fetchDebt();
+      } else {
+        setConfirmError(data.error?.message ?? "เกิดข้อผิดพลาด กรุณาลองใหม่");
+      }
+    } finally {
+      setConfirmLoading(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -141,7 +181,9 @@ export default function DebtDetailPage() {
         <div className="flex-1 min-w-0 ml-1">
           <h1 className="text-[18px] font-bold truncate leading-tight">{debt.name}</h1>
           <p className="text-[13px] text-muted-foreground">
-            {debt.status === "ACTIVE" ? "กำลังผ่อน" : debt.status === "COMPLETED" ? "ชำระครบแล้ว ✓" : "ยกเลิก"}
+            {debt.status === "ACTIVE" ? "กำลังผ่อน" :
+             debt.status === "PLANNED" ? "วางแผนไว้ (ยังไม่ใช่หนี้จริง)" :
+             debt.status === "COMPLETED" ? "ชำระครบแล้ว ✓" : "ยกเลิก"}
           </p>
         </div>
         <button
@@ -207,7 +249,19 @@ export default function DebtDetailPage() {
         )}
       </div>
 
-      {/* Payment schedule */}
+      {/* Payment schedule (PLANNED debts have none yet — show a confirm CTA instead) */}
+      {debt.status === "PLANNED" ? (
+        <div className="ios-card px-5 py-6 text-center space-y-3">
+          <p className="text-3xl">📋</p>
+          <p className="text-[14px] font-medium">เป็นแผนการเงิน ยังไม่มีตารางผ่อนชำระจริง</p>
+          <p className="text-[12px] text-muted-foreground">
+            กดยืนยันเมื่อพร้อมเริ่มผ่อนจริง — สามารถแก้ไขยอดรวมและจำนวนงวดได้ก่อนยืนยัน
+          </p>
+          <Button className="w-full" style={{ backgroundColor: "#FF9500" }} onClick={openConfirmPlan}>
+            ยืนยันเป็นหนี้จริง
+          </Button>
+        </div>
+      ) : (
       <div className="space-y-2">
         <p className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide px-1">ตารางผ่อนชำระ</p>
 
@@ -261,6 +315,7 @@ export default function DebtDetailPage() {
           ))}
         </div>
       </div>
+      )}
 
       {/* Converted-from transactions */}
       {debt.convertedTransactions.length > 0 && (
@@ -340,6 +395,39 @@ export default function DebtDetailPage() {
             <Button variant="secondary" onClick={() => setUnconvertDialogOpen(false)} disabled={unconvertLoading}>ยกเลิก</Button>
             <Button variant="destructive" onClick={handleUnconvert} disabled={unconvertLoading}>
               {unconvertLoading ? "กำลังดำเนินการ..." : "ยืนยัน"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm planned debt */}
+      <Dialog open={confirmPlanOpen} onOpenChange={(open) => { if (!open) setConfirmPlanOpen(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ยืนยันเป็นหนี้จริง</DialogTitle>
+            <DialogDescription>
+              ยอดเดิมเป็นเพียงประมาณการ แก้ไขให้ตรงกับยอดจริงก่อนยืนยัน ระบบจะสร้างตารางผ่อนชำระให้ทันที
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div className="space-y-1">
+              <p className="text-[12px] text-muted-foreground">ยอดรวมทั้งหมด (บาท)</p>
+              <Input type="number" inputMode="decimal" step="0.01" value={confirmAmount}
+                onChange={(e) => setConfirmAmount(e.target.value)}
+                className="bg-input h-11 rounded-xl border-0" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[12px] text-muted-foreground">จำนวนงวด (เดือน)</p>
+              <Input type="number" inputMode="numeric" min={1} max={360} value={confirmMonths}
+                onChange={(e) => setConfirmMonths(e.target.value)}
+                className="bg-input h-11 rounded-xl border-0" />
+            </div>
+            {confirmError && <p className="text-[12px] text-destructive">{confirmError}</p>}
+          </div>
+          <DialogFooter className="mt-4 gap-2">
+            <Button variant="secondary" onClick={() => setConfirmPlanOpen(false)} disabled={confirmLoading}>ยกเลิก</Button>
+            <Button onClick={handleConfirmPlanned} disabled={confirmLoading} style={{ backgroundColor: "#FF9500" }}>
+              {confirmLoading ? "กำลังยืนยัน..." : "ยืนยัน"}
             </Button>
           </DialogFooter>
         </DialogContent>
