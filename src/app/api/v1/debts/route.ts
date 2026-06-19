@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { createDebtSchema } from "@/lib/validations/debt";
 import { DebtStatus, Prisma } from "@/generated/prisma/client";
 import { addMonths } from "@/lib/utils";
-import { createDebtPaymentsAndBudgetItems } from "@/lib/debt-helpers";
+import { createDebtPaymentsAndBudgetItems, createBudgetItemsForDebt } from "@/lib/debt-helpers";
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     const statusParam = searchParams.get("status");
 
     const where: Prisma.DebtWhereInput = { userId: session.user.id };
-    if (statusParam === "ACTIVE" || statusParam === "COMPLETED" || statusParam === "CANCELLED") {
+    if (statusParam === "ACTIVE" || statusParam === "PLANNED" || statusParam === "COMPLETED" || statusParam === "CANCELLED") {
       where.status = statusParam as DebtStatus;
     }
 
@@ -77,7 +77,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, totalAmount, totalMonths, monthlyAmount, startDate, notes, familyGroupId, accountId, interestRate } = parsed.data;
+    const { name, totalAmount, totalMonths, monthlyAmount, startDate, notes, familyGroupId, accountId, interestRate, status } = parsed.data;
+    const effectiveStatus = status === "PLANNED" ? "PLANNED" : "ACTIVE";
     const isFamily = typeof body.isFamily === "boolean" ? body.isFamily : false;
 
     // familyGroupId controls cross-user visibility — verify membership before
@@ -128,18 +129,32 @@ export async function POST(req: NextRequest) {
           familyGroupId: isFamily ? (familyGroupId ?? null) : null,
           accountId: accountId ?? null,
           userId: session.user.id,
-          status: "ACTIVE",
+          status: effectiveStatus,
         },
       });
 
-      await createDebtPaymentsAndBudgetItems(tx, {
-        debtId: created.id,
-        debtName: created.name,
-        totalMonths,
-        monthlyAmount: effectiveMonthly,
-        startDate: start,
-        userId: session.user.id,
-      });
+      if (effectiveStatus === "PLANNED") {
+        // PLANNED debts are forecasts only — show up on the budget-page grid
+        // immediately (createBudgetItemsForDebt) but generate no real
+        // DebtPayment schedule until confirmed via POST /debts/[id]/confirm.
+        await createBudgetItemsForDebt(tx, {
+          debtId: created.id,
+          debtName: created.name,
+          totalMonths,
+          monthlyAmount: effectiveMonthly,
+          startDate: start,
+          userId: session.user.id,
+        });
+      } else {
+        await createDebtPaymentsAndBudgetItems(tx, {
+          debtId: created.id,
+          debtName: created.name,
+          totalMonths,
+          monthlyAmount: effectiveMonthly,
+          startDate: start,
+          userId: session.user.id,
+        });
+      }
 
       return tx.debt.findUnique({
         where: { id: created.id },
