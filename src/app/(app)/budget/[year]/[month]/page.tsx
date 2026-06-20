@@ -247,7 +247,7 @@ export default function BudgetMonthPage() {
     <div className="py-5 space-y-5">
       {/* Header: back + month nav */}
       <div className="flex items-center justify-between">
-        <Link href={`/budget?year=${year}`}
+        <Link href={`/budget/plan?year=${year}`}
           className="h-9 w-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors shrink-0">
           <ArrowLeft className="h-5 w-5" />
         </Link>

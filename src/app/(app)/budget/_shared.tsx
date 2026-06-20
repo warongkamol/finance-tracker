@@ -1,6 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
+} from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCurrency, cn } from "@/lib/utils";
@@ -109,6 +114,97 @@ export const Y_TICK_FORMATTER = (v: number) => (v >= 1000 ? `${(v / 1000).toFixe
 
 export function Skeleton({ className }: { className?: string }) {
   return <div className={cn("animate-pulse rounded-xl bg-border/50", className)} />;
+}
+
+// ─── Top-level route nav (shared across /budget, /budget/plan, /budget/track) ─
+
+const BUDGET_TOP_TABS = [
+  { href: "/budget", label: "ภาพรวม" },
+  { href: "/budget/plan", label: "วางแผน" },
+  { href: "/budget/track", label: "ติดตาม" },
+] as const;
+
+export function BudgetTopNav({ year }: { year: number }) {
+  const pathname = usePathname();
+  return (
+    <div className="ios-card p-1 grid grid-cols-3 gap-1">
+      {BUDGET_TOP_TABS.map(({ href, label }) => {
+        const active = pathname === href;
+        return (
+          <Link key={href} href={`${href}?year=${year}`}
+            className={cn(
+              "py-1.5 rounded-xl text-[13px] font-semibold text-center transition-all",
+              active ? "bg-primary text-white shadow-sm" : "text-muted-foreground"
+            )}>
+            {label}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Plan vs Actual chart (shared by /budget and /budget/plan) ────────────────
+
+export const OVER_BUDGET_COLOR = "#D70015";
+
+// Generic over T (not a fixed index-signature type) so callers can pass their
+// own named interface (e.g. YearlyComparisonMonth) directly — TS would reject
+// assigning a plain interface to a `[key: string]: ...` index-signature type.
+export function PlanVsActualChart<T extends { monthName: string }>({
+  data, plannedKey, actualKey, label, color,
+}: {
+  data: T[];
+  plannedKey: keyof T;
+  actualKey: keyof T;
+  label: string;
+  color: string;
+}) {
+  const hasData = data.some(d => Number(d[plannedKey]) > 0 || Number(d[actualKey]) > 0);
+  const chartData = data.map(d => ({
+    ...d,
+    remainder: Math.max(0, Number(d[plannedKey]) - Number(d[actualKey])),
+  }));
+  const hasOverBudget = chartData.some(d => Number(d[actualKey]) > Number(d[plannedKey]));
+
+  return (
+    <div>
+      <p className="text-[12px] font-medium text-muted-foreground mb-1">{label}</p>
+      {!hasData ? (
+        <p className="text-center py-6 text-[13px] text-muted-foreground">ยังไม่มีข้อมูล</p>
+      ) : (
+        <>
+          <ResponsiveContainer width="100%" height={150}>
+            <BarChart data={chartData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.06)" />
+              <XAxis dataKey="monthName" tick={AXIS_TICK} tickLine={false} axisLine={false} />
+              <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} tickFormatter={Y_TICK_FORMATTER} />
+              <Tooltip formatter={(value) => [formatCurrency(Number(value)), ""]} contentStyle={CHART_TOOLTIP_STYLE} />
+              <Bar dataKey={actualKey as string} stackId="a" radius={[3, 3, 0, 0]} maxBarSize={16}>
+                {chartData.map((d, i) => (
+                  <Cell key={i} fill={Number(d[actualKey]) > Number(d[plannedKey]) ? OVER_BUDGET_COLOR : color} />
+                ))}
+              </Bar>
+              <Bar dataKey="remainder" stackId="a" fill={`${color}33`} radius={[3, 3, 0, 0]} maxBarSize={16} />
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="flex items-center gap-3 pt-1">
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: color }} /> จริง
+            </span>
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: `${color}33` }} /> คงเหลือถึงแผน
+            </span>
+            {hasOverBudget && (
+              <span className="flex items-center gap-1 text-[11px] text-destructive">
+                <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: OVER_BUDGET_COLOR }} /> เกินแผน
+              </span>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 // ─── Item Form ─────────────────────────────────────────────────────────────────
