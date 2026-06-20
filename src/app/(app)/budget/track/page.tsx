@@ -80,7 +80,7 @@ function BudgetItemsCard({ items }: { items: Comparison["items"] }) {
                   item.type === "INCOME" ? "bg-[#34C759]" :
                   item.type === "LIABILITY" ? "bg-[#FF9500]" :
                   item.type === "SAVING" ? "bg-[#007AFF]" : "bg-[#FF3B30]"
-                )} style={{ width: `${Math.min(item.pct ?? 100, 100)}%` }} />
+                )} style={{ width: `${Math.min(item.pct ?? 0, 100)}%` }} />
               </div>
             )}
           </div>
