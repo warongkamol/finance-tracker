@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { formatCurrency, getMonthName, cn } from "@/lib/utils";
 import {
-  type ItemType, type Category, type Debt, type BudgetItem, type Comparison, type DebtCreationInput,
+  type ItemType, type Category, type Debt, type BudgetItem, type DebtCreationInput,
   TYPE_CONFIG, SHORT_MONTHS, Skeleton, debtMonthsForYear, ItemForm,
 } from "../../_shared";
 
@@ -54,11 +54,6 @@ export default function BudgetMonthPage() {
   const [loadingDebts, setLoadingDebts] = useState(false);
   const [selectedDebtIds, setSelectedDebtIds] = useState<string[]>([]);
   const [debtImporting, setDebtImporting] = useState(false);
-
-  // Comparison sheet
-  const [showComparison, setShowComparison] = useState(false);
-  const [comparison, setComparison] = useState<Comparison | null>(null);
-  const [loadingComparison, setLoadingComparison] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     setLoadingDetail(true);
@@ -217,16 +212,6 @@ export default function BudgetMonthPage() {
     } finally { setSaving(false); }
   }
 
-  async function fetchComparison() {
-    setShowComparison(true);
-    setLoadingComparison(true);
-    try {
-      const res = await fetch(`/api/v1/budgets/comparison?year=${year}&month=${month}`);
-      const d = await res.json();
-      if (d.success) setComparison(d.data);
-    } finally { setLoadingComparison(false); }
-  }
-
   const itemsByType = detail
     ? (Object.keys(TYPE_CONFIG) as ItemType[]).map(type => ({
         type,
@@ -266,14 +251,10 @@ export default function BudgetMonthPage() {
       </div>
 
       {/* Action toolbar */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <button onClick={() => setShowCopyDialog(true)}
           className="ios-card py-2.5 flex flex-col items-center gap-1 text-[12px] font-medium text-muted-foreground hover:text-primary transition-colors">
           <Copy className="h-4 w-4" /> คัดลอก
-        </button>
-        <button onClick={fetchComparison}
-          className="ios-card py-2.5 flex flex-col items-center gap-1 text-[12px] font-medium text-muted-foreground hover:text-primary transition-colors">
-          <span className="text-base leading-none">📊</span> เทียบจริง
         </button>
         <button onClick={openDebtImport}
           className="ios-card py-2.5 flex flex-col items-center gap-1 text-[12px] font-medium text-muted-foreground hover:text-[#FF9500] transition-colors">
@@ -503,97 +484,6 @@ export default function BudgetMonthPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Budget vs Actual sheet */}
-      <Sheet open={showComparison} onOpenChange={setShowComparison}>
-        <SheetContent title={`เปรียบเทียบงบ vs จริง — ${getMonthName(month)} ${year + 543}`}>
-          {loadingComparison ? (
-            <div className="space-y-3">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-14" />)}</div>
-          ) : !comparison ? null : !comparison.hasBudget ? (
-            <div className="text-center py-12">
-              <p className="text-3xl mb-2">📋</p>
-              <p className="text-[15px] font-medium">ยังไม่ได้ตั้งงบเดือนนี้</p>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "วางแผนรายรับ",  value: comparison.summary.plannedIncome,  color: "text-[#34C759]" },
-                  { label: "รายรับจริง",      value: comparison.summary.actualIncome,   color: "text-[#34C759]" },
-                  { label: "วางแผนรายจ่าย", value: comparison.summary.plannedExpense, color: "text-[#FF3B30]" },
-                  { label: "รายจ่ายจริง",    value: comparison.summary.actualExpense,  color: "text-[#FF3B30]" },
-                ].map(({ label, value, color }) => (
-                  <div key={label} className="ios-card px-3 py-3">
-                    <p className="text-[11px] text-muted-foreground">{label}</p>
-                    <p className={cn("text-[16px] font-bold tabular-nums mt-0.5", color)}>{formatCurrency(value)}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="ios-card px-4 py-3 flex justify-between items-center">
-                <div>
-                  <p className="text-[12px] text-muted-foreground">คงเหลือวางแผน</p>
-                  <p className={cn("text-[17px] font-bold tabular-nums",
-                    comparison.summary.plannedNet >= 0 ? "text-primary" : "text-destructive")}>
-                    {formatCurrency(comparison.summary.plannedNet)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[12px] text-muted-foreground">คงเหลือจริง</p>
-                  <p className={cn("text-[17px] font-bold tabular-nums",
-                    comparison.summary.actualNet >= 0 ? "text-primary" : "text-destructive")}>
-                    {formatCurrency(comparison.summary.actualNet)}
-                  </p>
-                </div>
-              </div>
-
-              {comparison.items.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-[13px] font-medium text-muted-foreground px-1">รายละเอียดแต่ละรายการ</p>
-                  <div className="ios-card overflow-hidden divide-y divide-border">
-                    {comparison.items.map(item => (
-                      <div key={item.id} className={cn("px-4 py-3", item.isOver && "bg-destructive/5")}>
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-base shrink-0">{TYPE_CONFIG[item.type].emoji}</span>
-                            <div className="min-w-0">
-                              <p className="text-[13px] font-medium truncate">{item.name}</p>
-                              {item.category && (
-                                <p className="text-[11px] text-muted-foreground">{item.category.icon} {item.category.name}</p>
-                              )}
-                            </div>
-                            {item.isOver && <span className="text-[11px] text-destructive font-bold shrink-0">เกิน!</span>}
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-[12px] text-muted-foreground">
-                              {formatCurrency(item.actual)} / {formatCurrency(item.planned)}
-                            </p>
-                            {item.pct !== null && (
-                              <p className={cn("text-[12px] font-semibold", item.isOver ? "text-destructive" : "text-[#34C759]")}>
-                                {item.pct}%
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        {item.planned > 0 && (
-                          <div className="w-full bg-border/50 rounded-full h-1.5 mt-2">
-                            <div className={cn("h-1.5 rounded-full transition-all",
-                              item.isOver ? "bg-destructive" :
-                              item.type === "INCOME" ? "bg-[#34C759]" :
-                              item.type === "LIABILITY" ? "bg-[#FF9500]" :
-                              item.type === "SAVING" ? "bg-[#007AFF]" : "bg-[#FF3B30]"
-                            )} style={{ width: `${Math.min(item.pct ?? 0, 100)}%` }} />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
 
       {saving && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-foreground text-background text-[13px] font-medium px-4 py-2 rounded-full shadow-lg z-50">
