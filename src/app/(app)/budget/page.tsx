@@ -193,10 +193,10 @@ function CategoryByMonthChart({
           <Tooltip formatter={(value) => [formatCurrency(Number(value)), ""]} contentStyle={CHART_TOOLTIP_STYLE} />
           {data.categories.map(cat => (
             <Bar key={cat.id} dataKey={cat.id} stackId="cat" fill={cat.color} maxBarSize={16}
-              onClick={(_, index) => onMonthClick(data.months[index].month)} />
+              onClick={(d) => onMonthClick(d.payload.month)} />
           ))}
           <Bar dataKey="other" stackId="cat" fill={OTHER_COLOR} radius={[3, 3, 0, 0]} maxBarSize={16}
-            onClick={(_, index) => onMonthClick(data.months[index].month)} />
+            onClick={(d) => onMonthClick(d.payload.month)} />
         </BarChart>
       </ResponsiveContainer>
       <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
