@@ -280,12 +280,9 @@ export function ItemForm({ initial, categories, isNew, currentMonth, currentYear
       });
       const json = await res.json();
       if (json.success) {
+        setAccountId(json.data.id);
         const list = await fetch("/api/v1/accounts").then(r => r.json());
-        if (list.success) {
-          setAccounts(list.data);
-          const created = (list.data as AccountOption[]).find(a => a.name === trimmed);
-          if (created) setAccountId(created.id);
-        }
+        if (list.success) setAccounts(list.data);
         setNewAccountName("");
         setShowNewAccount(false);
       }
