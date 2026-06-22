@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -8,6 +8,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DebtForm } from "@/components/forms/debt-form";
 import { formatCurrency, cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,16 +55,24 @@ export function debtMonthsForYear(debt: Debt, year: number): { month: number; am
     .sort((a, b) => a.month - b.month);
 }
 
+export interface AccountOption {
+  id: string;
+  name: string;
+  type: string;
+}
+
 export interface BudgetItem {
   id?: string;
   name: string;
   type: ItemType;
   amount: number;
   categoryId?: string | null;
+  accountId?: string | null;
   debtId?: string | null;
   notes?: string | null;
   sortOrder: number;
   category?: { id: string; name: string; icon: string | null } | null;
+  account?: { id: string; name: string; type: string } | null;
 }
 
 export interface ComparisonItem {
@@ -209,14 +218,6 @@ export function PlanVsActualChart<T extends { monthName: string }>({
 
 // ─── Item Form ─────────────────────────────────────────────────────────────────
 
-export interface DebtCreationInput {
-  name: string;
-  monthlyAmount: number;
-  totalMonths: number;
-  startDate: string;
-  notes?: string;
-}
-
 export interface ItemFormProps {
   initial?: Partial<BudgetItem>;
   categories: Category[];
@@ -224,27 +225,34 @@ export interface ItemFormProps {
   currentMonth: number;
   currentYear: number;
   onSave: (item: Omit<BudgetItem, "id">, months: number[]) => void;
-  onSaveDebt?: (debt: DebtCreationInput) => void;
+  onLiabilityCreated?: () => void;
   onCancel: () => void;
 }
 
-export function ItemForm({ initial, categories, isNew, currentMonth, currentYear, onSave, onSaveDebt, onCancel }: ItemFormProps) {
+export function ItemForm({ initial, categories, isNew, currentMonth, currentYear, onSave, onLiabilityCreated, onCancel }: ItemFormProps) {
   const [name, setName] = useState(initial?.name ?? "");
   const [type, setType] = useState<ItemType>(initial?.type ?? "EXPENSE");
   const [amount, setAmount] = useState(initial?.amount?.toString() ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? "");
+  const [accountId, setAccountId] = useState(initial?.accountId ?? "");
+  const [accounts, setAccounts] = useState<AccountOption[]>([]);
+  const [showNewAccount, setShowNewAccount] = useState(false);
+  const [newAccountName, setNewAccountName] = useState("");
+  const [creatingAccount, setCreatingAccount] = useState(false);
   const [error, setError] = useState("");
 
   // Month selection (new non-LIABILITY items only)
   const [monthMode, setMonthMode] = useState<"single" | "all" | "custom">("single");
   const [customMonths, setCustomMonths] = useState<number[]>([currentMonth]);
 
-  // Debt-specific fields (new LIABILITY items)
-  const [totalMonths, setTotalMonths] = useState(12);
-  const [debtStartMonth, setDebtStartMonth] = useState(currentMonth);
-
   const isNewLiability = isNew && type === "LIABILITY";
+
+  useEffect(() => {
+    fetch("/api/v1/accounts").then(r => r.json()).then(d => { if (d.success) setAccounts(d.data); });
+  }, []);
+
+  const savingsAccounts = accounts.filter(a => a.type === "CASH" || a.type === "SAVINGS");
 
   const filteredCategories = categories.filter(c =>
     type === "INCOME" ? c.type === "INCOME" :
@@ -260,34 +268,70 @@ export function ItemForm({ initial, categories, isNew, currentMonth, currentYear
     setCustomMonths(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
   }
 
-  // Compute debt end month label
-  const endMonthIdx = ((debtStartMonth - 1 + totalMonths - 1) % 12);
-  const endYearOffset = Math.floor((debtStartMonth - 1 + totalMonths - 1) / 12);
-  const endLabel = `${SHORT_MONTHS[endMonthIdx]} ${currentYear + endYearOffset + 543}`;
+  async function handleCreateAccount() {
+    const trimmed = newAccountName.trim();
+    if (!trimmed) return;
+    setCreatingAccount(true);
+    try {
+      const res = await fetch("/api/v1/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed, type: "SAVINGS", initialBalance: 0 }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        const list = await fetch("/api/v1/accounts").then(r => r.json());
+        if (list.success) {
+          setAccounts(list.data);
+          const created = (list.data as AccountOption[]).find(a => a.name === trimmed);
+          if (created) setAccountId(created.id);
+        }
+        setNewAccountName("");
+        setShowNewAccount(false);
+      }
+    } finally {
+      setCreatingAccount(false);
+    }
+  }
 
   function handleSave() {
     if (!name.trim()) { setError("กรุณากรอกชื่อ"); return; }
     const num = parseFloat(amount);
     if (isNaN(num) || num <= 0) { setError("จำนวนเงินต้องมากกว่า 0"); return; }
-
-    if (isNewLiability) {
-      // Create actual debt record
-      if (totalMonths < 1 || totalMonths > 360) { setError("จำนวนงวดต้อง 1-360 เดือน"); return; }
-      const mm = String(debtStartMonth).padStart(2, "0");
-      onSaveDebt?.({
+    if (monthMode === "custom" && isNew && customMonths.length === 0) { setError("กรุณาเลือกอย่างน้อย 1 เดือน"); return; }
+    onSave(
+      {
         name: name.trim(),
-        monthlyAmount: num,
-        totalMonths,
-        startDate: `${currentYear}-${mm}-01`,
-        notes: notes || undefined,
-      });
-    } else {
-      if (monthMode === "custom" && customMonths.length === 0) { setError("กรุณาเลือกอย่างน้อย 1 เดือน"); return; }
-      onSave(
-        { name: name.trim(), type, amount: num, notes: notes || null, sortOrder: initial?.sortOrder ?? 0, categoryId: categoryId || null },
-        selectedMonths,
-      );
-    }
+        type,
+        amount: num,
+        notes: notes || null,
+        sortOrder: initial?.sortOrder ?? 0,
+        categoryId: type === "SAVING" ? null : (categoryId || null),
+        accountId: type === "SAVING" ? (accountId || null) : null,
+      },
+      selectedMonths,
+    );
+  }
+
+  // New LIABILITY items use the full DebtForm (creates a PLANNED debt) instead
+  // of the generic fields below — see Plan 6's design decision 1.
+  if (isNewLiability) {
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-4 gap-1">
+          {(Object.keys(TYPE_CONFIG) as ItemType[]).map(t => (
+            <button key={t} type="button"
+              onClick={() => setType(t)}
+              className={cn("py-1.5 rounded-xl text-[12px] font-semibold transition-all",
+                type === t ? `${TYPE_CONFIG[t].bg} ${TYPE_CONFIG[t].color}` : "bg-muted text-muted-foreground"
+              )}>
+              {TYPE_CONFIG[t].emoji} {TYPE_CONFIG[t].label}
+            </button>
+          ))}
+        </div>
+        <DebtForm forcePlanned onSuccess={() => onLiabilityCreated?.()} onCancel={onCancel} />
+      </div>
+    );
   }
 
   return (
@@ -296,7 +340,7 @@ export function ItemForm({ initial, categories, isNew, currentMonth, currentYear
       <div className="grid grid-cols-4 gap-1">
         {(Object.keys(TYPE_CONFIG) as ItemType[]).map(t => (
           <button key={t} type="button"
-            onClick={() => { setType(t); setCategoryId(""); setError(""); }}
+            onClick={() => { setType(t); setCategoryId(""); setAccountId(""); setError(""); }}
             className={cn("py-1.5 rounded-xl text-[12px] font-semibold transition-all",
               type === t ? `${TYPE_CONFIG[t].bg} ${TYPE_CONFIG[t].color}` : "bg-muted text-muted-foreground"
             )}>
@@ -307,122 +351,105 @@ export function ItemForm({ initial, categories, isNew, currentMonth, currentYear
 
       {/* Name */}
       <Input
-        placeholder={isNewLiability ? "ชื่อหนี้สิน เช่น ผ่อนรถ, สินเชื่อบ้าน" : "ชื่อรายการ เช่น เงินเดือน, ค่าเช่า"}
+        placeholder="ชื่อรายการ เช่น เงินเดือน, ค่าเช่า"
         value={name} onChange={e => setName(e.target.value)}
         className="bg-input h-11 rounded-xl border-0" />
 
       {/* Amount */}
       <Input type="number" inputMode="decimal" step="0.01"
-        placeholder={isNewLiability ? "ยอดผ่อนต่อเดือน (บาท)" : "จำนวนเงินวางแผน (บาท)"}
+        placeholder="จำนวนเงินวางแผน (บาท)"
         value={amount} onChange={e => setAmount(e.target.value)}
         className={cn("bg-input h-11 rounded-xl border-0 text-[18px] font-bold", TYPE_CONFIG[type].color)} />
 
-      {/* Debt-specific fields */}
-      {isNewLiability ? (
-        <div className="space-y-3 pt-1 border-t border-border/40">
-          <p className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide">
-            รายละเอียดหนี้สิน
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <p className="text-[11px] text-muted-foreground">จำนวนงวด (เดือน)</p>
-              <Input type="number" inputMode="numeric" min={1} max={360}
-                value={totalMonths} onChange={e => setTotalMonths(parseInt(e.target.value) || 1)}
-                className="bg-input h-10 rounded-xl border-0" />
+      {type === "SAVING" ? (
+        <div className="space-y-2">
+          <select value={accountId} onChange={e => setAccountId(e.target.value)}
+            className="w-full h-11 rounded-xl bg-input border-0 px-3 text-[14px] text-foreground appearance-none">
+            <option value="">— เลือกกระเป๋าออม (ไม่บังคับ) —</option>
+            {savingsAccounts.map(a => (
+              <option key={a.id} value={a.id}>{a.type === "CASH" ? "💵" : "💰"} {a.name}</option>
+            ))}
+          </select>
+          {showNewAccount ? (
+            <div className="flex gap-2">
+              <Input placeholder="ชื่อกระเป๋าออมใหม่" value={newAccountName}
+                onChange={e => setNewAccountName(e.target.value)}
+                className="bg-input h-10 rounded-xl border-0 flex-1" />
+              <Button type="button" size="sm" disabled={creatingAccount || !newAccountName.trim()} onClick={handleCreateAccount}>
+                {creatingAccount ? "..." : "เพิ่ม"}
+              </Button>
             </div>
-            <div className="space-y-1">
-              <p className="text-[11px] text-muted-foreground">เริ่มงวดแรก</p>
-              <select value={debtStartMonth} onChange={e => setDebtStartMonth(parseInt(e.target.value))}
-                className="w-full h-10 rounded-xl bg-input border-0 px-3 text-[14px] appearance-none">
-                {SHORT_MONTHS.map((label, i) => (
-                  <option key={i + 1} value={i + 1}>{label} {currentYear + 543}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          {/* Summary */}
-          {parseFloat(amount) > 0 && totalMonths > 0 && (
-            <div className="rounded-xl bg-[#FF9500]/10 px-3 py-2.5 space-y-0.5">
-              <div className="flex justify-between text-[12px]">
-                <span className="text-muted-foreground">ยอดรวมทั้งหมด</span>
-                <span className="font-bold text-[#FF9500]">{formatCurrency(parseFloat(amount) * totalMonths)}</span>
-              </div>
-              <div className="flex justify-between text-[12px]">
-                <span className="text-muted-foreground">ชำระครบ</span>
-                <span className="font-medium">{endLabel}</span>
-              </div>
-            </div>
+          ) : (
+            <button type="button" onClick={() => setShowNewAccount(true)}
+              className="text-[12px] font-medium text-primary">
+              + สร้างกระเป๋าออมใหม่
+            </button>
           )}
         </div>
       ) : (
-        <>
-          {/* Category (non-liability) */}
-          <select value={categoryId} onChange={e => setCategoryId(e.target.value)}
-            className="w-full h-11 rounded-xl bg-input border-0 px-3 text-[14px] text-foreground appearance-none">
-            <option value="">— หมวดหมู่ (ไม่บังคับ) —</option>
-            {filteredCategories.map(c => (
-              <optgroup key={c.id} label={`${c.icon ?? ""} ${c.name}`}>
-                <option value={c.id}>{c.icon ?? ""} {c.name} (ทั้งหมด)</option>
-                {c.children.map(ch => (
-                  <option key={ch.id} value={ch.id}>　{ch.icon ?? ""} {ch.name}</option>
-                ))}
-              </optgroup>
+        <select value={categoryId} onChange={e => setCategoryId(e.target.value)}
+          className="w-full h-11 rounded-xl bg-input border-0 px-3 text-[14px] text-foreground appearance-none">
+          <option value="">— หมวดหมู่ (ไม่บังคับ) —</option>
+          {filteredCategories.map(c => (
+            <optgroup key={c.id} label={`${c.icon ?? ""} ${c.name}`}>
+              <option value={c.id}>{c.icon ?? ""} {c.name} (ทั้งหมด)</option>
+              {c.children.map(ch => (
+                <option key={ch.id} value={ch.id}>　{ch.icon ?? ""} {ch.name}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      )}
+
+      {/* Notes */}
+      <Input placeholder="หมายเหตุ (ไม่บังคับ)" value={notes ?? ""}
+        onChange={e => setNotes(e.target.value)} className="bg-input h-11 rounded-xl border-0" />
+
+      {/* Month selector — new items only */}
+      {isNew && (
+        <div className="space-y-2 pt-1 border-t border-border/40">
+          <p className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide">ใช้กี่เดือน?</p>
+          <div className="grid grid-cols-3 gap-1">
+            {(["single", "all", "custom"] as const).map(mode => (
+              <button key={mode} type="button"
+                onClick={() => { setMonthMode(mode); if (mode === "custom") setCustomMonths([currentMonth]); }}
+                className={cn("py-2 rounded-xl text-[12px] font-semibold transition-all",
+                  monthMode === mode ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                )}>
+                {mode === "single" ? "เดือนนี้" : mode === "all" ? "ทุก 12 เดือน" : "เลือกเอง"}
+              </button>
             ))}
-          </select>
-
-          {/* Notes */}
-          <Input placeholder="หมายเหตุ (ไม่บังคับ)" value={notes ?? ""}
-            onChange={e => setNotes(e.target.value)} className="bg-input h-11 rounded-xl border-0" />
-
-          {/* Month selector — new non-LIABILITY items only */}
-          {isNew && (
-            <div className="space-y-2 pt-1 border-t border-border/40">
-              <p className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide">ใช้กี่เดือน?</p>
-              <div className="grid grid-cols-3 gap-1">
-                {(["single", "all", "custom"] as const).map(mode => (
-                  <button key={mode} type="button"
-                    onClick={() => { setMonthMode(mode); if (mode === "custom") setCustomMonths([currentMonth]); }}
-                    className={cn("py-2 rounded-xl text-[12px] font-semibold transition-all",
-                      monthMode === mode ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+          </div>
+          {monthMode === "custom" && (
+            <div className="grid grid-cols-4 gap-1">
+              {SHORT_MONTHS.map((label, i) => {
+                const m = i + 1;
+                const sel = customMonths.includes(m);
+                return (
+                  <button key={m} type="button" onClick={() => toggleCustomMonth(m)}
+                    className={cn("py-1.5 rounded-lg text-[12px] font-medium transition-all",
+                      sel ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                     )}>
-                    {mode === "single" ? "เดือนนี้" : mode === "all" ? "ทุก 12 เดือน" : "เลือกเอง"}
+                    {label}
                   </button>
-                ))}
-              </div>
-              {monthMode === "custom" && (
-                <div className="grid grid-cols-4 gap-1">
-                  {SHORT_MONTHS.map((label, i) => {
-                    const m = i + 1;
-                    const sel = customMonths.includes(m);
-                    return (
-                      <button key={m} type="button" onClick={() => toggleCustomMonth(m)}
-                        className={cn("py-1.5 rounded-lg text-[12px] font-medium transition-all",
-                          sel ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                        )}>
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {monthMode !== "single" && (
-                <p className="text-[11px] text-muted-foreground text-center">
-                  รายการนี้จะถูกเพิ่มใน {selectedMonths.length} เดือน
-                </p>
-              )}
+                );
+              })}
             </div>
           )}
-        </>
+          {monthMode !== "single" && (
+            <p className="text-[11px] text-muted-foreground text-center">
+              รายการนี้จะถูกเพิ่มใน {selectedMonths.length} เดือน
+            </p>
+          )}
+        </div>
       )}
 
       {error && <p className="text-[12px] text-destructive">{error}</p>}
 
       <div className="flex gap-2">
         <Button variant="secondary" className="flex-1" onClick={onCancel}>ยกเลิก</Button>
-        <Button className="flex-1" onClick={handleSave}
-          style={isNewLiability ? { backgroundColor: "#FF9500" } : {}}>
-          {isNewLiability ? "สร้างหนี้สิน" :
-           isNew && monthMode !== "single" ? `บันทึก (${selectedMonths.length} เดือน)` : "บันทึก"}
+        <Button className="flex-1" onClick={handleSave}>
+          {isNew && monthMode !== "single" ? `บันทึก (${selectedMonths.length} เดือน)` : "บันทึก"}
         </Button>
       </div>
     </div>
