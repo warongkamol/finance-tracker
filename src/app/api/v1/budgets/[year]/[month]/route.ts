@@ -29,7 +29,10 @@ export async function GET(_: NextRequest, { params }: Params) {
     where: { userId_year_month: { userId: session.user.id, year: y, month: m } },
     include: {
       items: {
-        include: { category: true },
+        include: {
+          category: true,
+          account: { select: { id: true, name: true, type: true } },
+        },
         orderBy: [{ type: "asc" }, { sortOrder: "asc" }],
       },
     },
@@ -69,6 +72,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     type: item.type,
     amount: item.amount,
     categoryId: item.categoryId || null,
+    accountId: item.accountId || null,
     notes: item.notes || null,
     sortOrder: item.sortOrder ?? idx,
   }));
@@ -79,7 +83,15 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const result = await prisma.budget.findUnique({
     where: { id: budget.id },
-    include: { items: { include: { category: true }, orderBy: [{ type: "asc" }, { sortOrder: "asc" }] } },
+    include: {
+      items: {
+        include: {
+          category: true,
+          account: { select: { id: true, name: true, type: true } },
+        },
+        orderBy: [{ type: "asc" }, { sortOrder: "asc" }],
+      },
+    },
   });
 
   return NextResponse.json({ success: true, data: serializeBudget(result) });
