@@ -27,6 +27,7 @@ interface DebtFormProps {
   onCancel: () => void;
   inFamilyGroup?: boolean;
   familyGroups?: FamilyGroup[];
+  forcePlanned?: boolean;
 }
 
 function todayString(): string {
@@ -46,7 +47,7 @@ function FormRow({ label, error, children }: { label: string; error?: string; ch
 
 const fieldClass = "bg-input h-11 rounded-xl border-0";
 
-export function DebtForm({ onSuccess, onCancel, inFamilyGroup = false, familyGroups = [] }: DebtFormProps) {
+export function DebtForm({ onSuccess, onCancel, inFamilyGroup = false, familyGroups = [], forcePlanned = false }: DebtFormProps) {
   const [serverError, setServerError] = useState("");
   const [useCustomMonthly, setUseCustomMonthly] = useState(false);
   const [isFamily, setIsFamily] = useState(false);
@@ -87,6 +88,7 @@ export function DebtForm({ onSuccess, onCancel, inFamilyGroup = false, familyGro
         interestRate: monthlyRate > 0 ? monthlyRate : null,
         isFamily,
         familyGroupId: isFamily ? familyGroupId : null,
+        ...(forcePlanned ? { status: "PLANNED" as const } : {}),
       };
       const res = await fetch("/api/v1/debts", {
         method: "POST",
@@ -254,7 +256,7 @@ export function DebtForm({ onSuccess, onCancel, inFamilyGroup = false, familyGro
         <Button type="button" variant="secondary" className="flex-1" onClick={onCancel} disabled={isSubmitting}>ยกเลิก</Button>
         <Button type="submit" className="flex-1" disabled={isSubmitting}>
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-          บันทึกหนี้สิน
+          {forcePlanned ? "สร้างหนี้สินวางแผน" : "บันทึกหนี้สิน"}
         </Button>
       </div>
     </form>
