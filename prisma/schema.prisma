@@ -198,6 +198,7 @@ model Account {
   transfersFrom Transfer[]   @relation("TransferFrom")
   transfersTo   Transfer[]   @relation("TransferTo")
   debts         Debt[]
+  budgetItems   BudgetItem[]
 
   @@index([userId])
   @@map("accounts")
@@ -402,6 +403,8 @@ model BudgetItem {
   amount     Decimal        @db.Decimal(12, 2)
   categoryId String?        @map("category_id")
   category   Category?      @relation(fields: [categoryId], references: [id])
+  accountId  String?        @map("account_id")
+  account    Account?       @relation(fields: [accountId], references: [id])
   notes      String?
   sortOrder  Int            @default(0) @map("sort_order")
 
@@ -409,6 +412,7 @@ model BudgetItem {
 
   @@index([budgetId])
   @@index([debtId])
+  @@index([accountId])
   @@map("budget_items")
 }
 
