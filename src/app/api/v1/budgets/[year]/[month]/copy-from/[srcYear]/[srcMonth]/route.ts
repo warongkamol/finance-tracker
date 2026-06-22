@@ -36,6 +36,7 @@ export async function POST(_: NextRequest, { params }: Params) {
       type: item.type,
       amount: item.amount,
       categoryId: item.categoryId,
+      accountId: item.accountId,
       notes: item.notes,
       sortOrder: item.sortOrder,
     })),
@@ -43,7 +44,15 @@ export async function POST(_: NextRequest, { params }: Params) {
 
   const result = await prisma.budget.findUnique({
     where: { id: dest.id },
-    include: { items: { include: { category: true }, orderBy: [{ type: "asc" }, { sortOrder: "asc" }] } },
+    include: {
+      items: {
+        include: {
+          category: true,
+          account: { select: { id: true, name: true, type: true } },
+        },
+        orderBy: [{ type: "asc" }, { sortOrder: "asc" }],
+      },
+    },
   });
 
   // Prisma Decimal serializes via JSON.stringify without a guaranteed decimal
