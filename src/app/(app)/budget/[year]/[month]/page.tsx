@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { formatCurrency, getMonthName, cn } from "@/lib/utils";
 import {
-  type ItemType, type Category, type Debt, type BudgetItem, type DebtCreationInput,
+  type ItemType, type Category, type Debt, type BudgetItem,
   TYPE_CONFIG, SHORT_MONTHS, Skeleton, debtMonthsForYear, ItemForm,
 } from "../../_shared";
 
@@ -18,6 +18,8 @@ interface MonthDetail {
   month: number;
   items: BudgetItem[];
 }
+
+const ACCOUNT_EMOJI: Record<string, string> = { CASH: "💵", SAVINGS: "💰" };
 
 // Adjacent month, wrapping across year boundaries (Dec ↔ Jan)
 function adjacentMonth(year: number, month: number, delta: 1 | -1): { year: number; month: number } {
@@ -192,24 +194,9 @@ export default function BudgetMonthPage() {
     } finally { setDebtImporting(false); }
   }
 
-  async function handleCreateDebt(input: DebtCreationInput) {
-    setSaving(true);
+  async function handleLiabilityCreated() {
     setAddingItem(false);
-    try {
-      await fetch("/api/v1/debts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: input.name,
-          totalAmount: input.monthlyAmount * input.totalMonths,
-          totalMonths: input.totalMonths,
-          monthlyAmount: input.monthlyAmount,
-          startDate: input.startDate,
-          notes: input.notes,
-        }),
-      });
-      await fetchDetail();
-    } finally { setSaving(false); }
+    await fetchDetail();
   }
 
   const itemsByType = detail
@@ -284,12 +271,16 @@ export default function BudgetMonthPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         {item.category?.icon && <span className="text-sm">{item.category.icon}</span>}
+                        {item.account && <span className="text-sm">{ACCOUNT_EMOJI[item.account.type] ?? "💰"}</span>}
                         <p className="text-[14px] font-medium truncate">{item.name}</p>
                       </div>
                       {item.category && (
                         <p className="text-[11px] text-muted-foreground">{item.category.name}</p>
                       )}
-                      {item.notes && !item.category && (
+                      {item.account && !item.category && (
+                        <p className="text-[11px] text-muted-foreground">{item.account.name}</p>
+                      )}
+                      {item.notes && !item.category && !item.account && (
                         <p className="text-[11px] text-muted-foreground">{item.notes}</p>
                       )}
                     </div>
@@ -372,7 +363,7 @@ export default function BudgetMonthPage() {
               currentMonth={month}
               currentYear={year}
               onSave={addingItem ? handleAddItem : (updated) => editingIdx !== null && handleEditItem(editingIdx, updated)}
-              onSaveDebt={addingItem ? handleCreateDebt : undefined}
+              onLiabilityCreated={addingItem ? handleLiabilityCreated : undefined}
               onCancel={() => { setAddingItem(false); setEditingIdx(null); }}
             />
           )}
